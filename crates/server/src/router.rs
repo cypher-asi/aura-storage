@@ -13,4 +13,8 @@ pub fn create_router() -> Router<AppState> {
         // Specs
         .route("/api/projects/:projectId/specs", post(handlers::specs::create_spec).get(handlers::specs::list_specs))
         .route("/api/specs/:id", get(handlers::specs::get_spec).put(handlers::specs::update_spec).delete(handlers::specs::delete_spec))
+        // Tasks
+        .route("/api/projects/:projectId/tasks", post(handlers::tasks::create_task).get(handlers::tasks::list_tasks))
+        .route("/api/tasks/:id", get(handlers::tasks::get_task).put(handlers::tasks::update_task).delete(handlers::tasks::delete_task))
+        .route("/api/tasks/:id/transition", post(handlers::tasks::transition_task))
 }

@@ -1,5 +1,6 @@
 pub mod project_agents;
 pub mod specs;
+pub mod tasks;
 
 use axum::Json;
 
