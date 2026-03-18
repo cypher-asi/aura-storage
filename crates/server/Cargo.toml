@@ -1,0 +1,27 @@
+[package]
+name = "aura-storage-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+aura-storage-core = { workspace = true }
+aura-storage-db = { workspace = true }
+aura-storage-auth = { workspace = true }
+aura-storage-project-agents = { workspace = true }
+aura-storage-specs = { workspace = true }
+aura-storage-tasks = { workspace = true }
+aura-storage-sessions = { workspace = true }
+aura-storage-messages = { workspace = true }
+aura-storage-logs = { workspace = true }
+axum = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+dotenvy = { workspace = true }

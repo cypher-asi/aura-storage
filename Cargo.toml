@@ -1,0 +1,43 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/db",
+    "crates/auth",
+    "crates/server",
+    "crates/domain/project-agents",
+    "crates/domain/specs",
+    "crates/domain/tasks",
+    "crates/domain/sessions",
+    "crates/domain/messages",
+    "crates/domain/logs",
+]
+
+[workspace.dependencies]
+# Shared dependencies pinned at workspace level
+axum = { version = "0.7", features = ["ws"] }
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "json", "migrate"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tower = { version = "0.5", features = ["limit"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "limit"] }
+dotenvy = "0.15"
+reqwest = { version = "0.12", features = ["json"] }
+jsonwebtoken = "9"
+
+# Internal crate references
+aura-storage-core = { path = "crates/core" }
+aura-storage-db = { path = "crates/db" }
+aura-storage-auth = { path = "crates/auth" }
+aura-storage-project-agents = { path = "crates/domain/project-agents" }
+aura-storage-specs = { path = "crates/domain/specs" }
+aura-storage-tasks = { path = "crates/domain/tasks" }
+aura-storage-sessions = { path = "crates/domain/sessions" }
+aura-storage-messages = { path = "crates/domain/messages" }
+aura-storage-logs = { path = "crates/domain/logs" }

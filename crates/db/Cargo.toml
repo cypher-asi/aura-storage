@@ -1,0 +1,9 @@
+[package]
+name = "aura-storage-db"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+aura-storage-core = { workspace = true }
+sqlx = { workspace = true }
+tracing = { workspace = true }
