@@ -1,3 +1,5 @@
+pub mod project_agents;
+
 use axum::Json;
 
 pub async fn health() -> Json<serde_json::Value> {
