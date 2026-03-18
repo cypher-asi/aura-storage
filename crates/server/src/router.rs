@@ -22,4 +22,6 @@ pub fn create_router() -> Router<AppState> {
         .route("/api/sessions/:id", get(handlers::sessions::get_session).put(handlers::sessions::update_session))
         // Messages
         .route("/api/sessions/:sessionId/messages", post(handlers::messages::create_message).get(handlers::messages::list_messages))
+        // Log Entries
+        .route("/api/projects/:projectId/logs", post(handlers::logs::create_log_entry).get(handlers::logs::list_log_entries))
 }
