@@ -10,4 +10,7 @@ pub fn create_router() -> Router<AppState> {
         // Project Agents
         .route("/api/projects/:projectId/agents", post(handlers::project_agents::create_project_agent).get(handlers::project_agents::list_project_agents))
         .route("/api/project-agents/:id", get(handlers::project_agents::get_project_agent).put(handlers::project_agents::update_project_agent).delete(handlers::project_agents::delete_project_agent))
+        // Specs
+        .route("/api/projects/:projectId/specs", post(handlers::specs::create_spec).get(handlers::specs::list_specs))
+        .route("/api/specs/:id", get(handlers::specs::get_spec).put(handlers::specs::update_spec).delete(handlers::specs::delete_spec))
 }
