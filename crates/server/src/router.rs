@@ -24,4 +24,9 @@ pub fn create_router() -> Router<AppState> {
         .route("/api/sessions/:sessionId/messages", post(handlers::messages::create_message).get(handlers::messages::list_messages))
         // Log Entries
         .route("/api/projects/:projectId/logs", post(handlers::logs::create_log_entry).get(handlers::logs::list_log_entries))
+        // Internal (X-Internal-Token auth)
+        .route("/internal/sessions", post(handlers::internal::create_session))
+        .route("/internal/messages", post(handlers::internal::create_message))
+        .route("/internal/logs", post(handlers::internal::create_log))
+        .route("/internal/project-agents/:id/status", post(handlers::internal::update_agent_status))
 }
