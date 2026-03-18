@@ -1,3 +1,4 @@
+pub mod messages;
 pub mod project_agents;
 pub mod sessions;
 pub mod specs;
