@@ -210,11 +210,13 @@ Messages are the LLM conversation history within a session.
   "content": "Message text",
   "contentBlocks": [{"type": "text", "text": "..."}],
   "inputTokens": 500,
-  "outputTokens": 200
+  "outputTokens": 200,
+  "thinking": "Let me think about this...",
+  "thinkingDurationMs": 1500
 }
 ```
 
-`createdBy` is nullable — omit for system messages. `role` determines the message type (user prompt, assistant response, or system context).
+`createdBy` is nullable — omit for system messages. `role` determines the message type (user prompt, assistant response, or system context). `thinking` and `thinkingDurationMs` store Claude's extended thinking content and duration.
 
 ### Log Entries
 
@@ -269,7 +271,9 @@ Internal endpoints include fields that the public endpoints derive from path par
   "role": "assistant",
   "content": "Message text",
   "inputTokens": 500,
-  "outputTokens": 200
+  "outputTokens": 200,
+  "thinking": "Extended thinking content",
+  "thinkingDurationMs": 1500
 }
 ```
 
