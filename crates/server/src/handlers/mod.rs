@@ -4,6 +4,7 @@ pub mod messages;
 pub mod project_agents;
 pub mod sessions;
 pub mod specs;
+pub mod stats;
 pub mod tasks;
 pub mod ws;
 
