@@ -80,13 +80,14 @@ async fn get_project_stats(
             COALESCE((SELECT COUNT(*) FROM messages WHERE project_id = $1), 0) as total_messages,
             COALESCE((SELECT COUNT(*) FROM project_agents WHERE project_id = $1), 0) as total_agents,
             COALESCE((SELECT COUNT(*) FROM sessions WHERE project_id = $1), 0) as total_sessions,
-            COALESCE((SELECT SUM(EXTRACT(EPOCH FROM (ended_at - started_at))) FROM sessions WHERE project_id = $1 AND ended_at IS NOT NULL), 0) as total_time_seconds,
+            COALESCE((SELECT SUM(EXTRACT(EPOCH FROM (ended_at - started_at)))::float8 FROM sessions WHERE project_id = $1 AND ended_at IS NOT NULL), 0)::float8 as total_time_seconds,
             COALESCE((
                 SELECT SUM(
-                    (elem->>'linesAdded')::bigint + (elem->>'linesRemoved')::bigint
+                    COALESCE((elem->>'linesAdded')::bigint, 0) + COALESCE((elem->>'linesRemoved')::bigint, 0)
                 )::int8
-                FROM tasks, jsonb_array_elements(files_changed) AS elem
-                WHERE tasks.project_id = $1 AND files_changed IS NOT NULL
+                FROM tasks
+                CROSS JOIN LATERAL jsonb_array_elements(COALESCE(files_changed, '[]'::jsonb)) AS elem
+                WHERE tasks.project_id = $1 AND files_changed IS NOT NULL AND jsonb_typeof(files_changed) = 'array'
             ), 0) as lines_changed,
             COALESCE((SELECT COUNT(*) FROM specs WHERE project_id = $1), 0) as total_specs
         "#,
