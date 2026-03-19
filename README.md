@@ -239,6 +239,39 @@ Structured logs for project agent activity.
 }
 ```
 
+### Stats
+
+Aggregated execution stats at project, org, or network level.
+
+| Method | Path | Description | Auth |
+|---|---|---|---|
+| GET | `/api/stats?scope=project&projectId=...` | Project-level stats | JWT |
+| GET | `/api/stats?scope=org&orgId=...` | Org-level stats | JWT |
+| GET | `/api/stats?scope=network` | Network-wide stats | JWT |
+
+Returns:
+```json
+{
+  "totalTasks": 25,
+  "pendingTasks": 3,
+  "readyTasks": 2,
+  "inProgressTasks": 5,
+  "blockedTasks": 1,
+  "doneTasks": 12,
+  "failedTasks": 2,
+  "completionPercentage": 48.0,
+  "totalTokens": 150000,
+  "totalMessages": 340,
+  "totalAgents": 3,
+  "totalSessions": 8,
+  "totalTimeSeconds": 3600,
+  "linesChanged": 450,
+  "totalSpecs": 4
+}
+```
+
+Same response shape at all scope levels. Token cost, commits, and PRs come from aura-network and orbit respectively.
+
 ### Internal Endpoints
 
 Authenticated via `X-Internal-Token` header. Called by aura-swarm and other backend services.
@@ -388,7 +421,7 @@ Same API as desktop — all endpoints are API-first. Authenticate via zOS, then 
 | Crate | Description |
 |---|---|
 | **aura-storage-core** | Shared types, error handling, pagination |
-| **aura-storage-db** | PostgreSQL connection pool and migrations (6 migrations) |
+| **aura-storage-db** | PostgreSQL connection pool and migrations (9 migrations) |
 | **aura-storage-auth** | JWT validation (Auth0 JWKS + HS256) and auth extractors |
 | **aura-storage-server** | Axum HTTP server, router, handlers, WebSocket |
 | **aura-storage-project-agents** | Project agent assignment and status tracking |
