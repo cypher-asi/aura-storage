@@ -32,6 +32,8 @@ pub struct InternalCreateMessageRequest {
     pub content_blocks: Option<serde_json::Value>,
     pub input_tokens: Option<i32>,
     pub output_tokens: Option<i32>,
+    pub thinking: Option<String>,
+    pub thinking_duration_ms: Option<i64>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -80,6 +82,8 @@ pub async fn create_message(
         content_blocks: input.content_blocks,
         input_tokens: input.input_tokens,
         output_tokens: input.output_tokens,
+        thinking: input.thinking,
+        thinking_duration_ms: input.thinking_duration_ms,
     };
     let message = msg_repo::create(&state.pool, input.session_id, &req).await?;
     Ok(Json(message))

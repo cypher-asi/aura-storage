@@ -15,6 +15,8 @@ pub struct Message {
     pub content_blocks: Option<serde_json::Value>,
     pub input_tokens: Option<i32>,
     pub output_tokens: Option<i32>,
+    pub thinking: Option<String>,
+    pub thinking_duration_ms: Option<i64>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -29,4 +31,6 @@ pub struct CreateMessageRequest {
     pub content_blocks: Option<serde_json::Value>,
     pub input_tokens: Option<i32>,
     pub output_tokens: Option<i32>,
+    pub thinking: Option<String>,
+    pub thinking_duration_ms: Option<i64>,
 }
