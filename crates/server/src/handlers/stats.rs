@@ -13,6 +13,7 @@ use crate::state::AppState;
 pub struct StatsQuery {
     pub scope: String,
     pub project_id: Option<Uuid>,
+    pub org_id: Option<Uuid>,
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
@@ -45,54 +46,113 @@ pub async fn get_stats(
             let project_id = query.project_id.ok_or_else(|| {
                 AppError::BadRequest("projectId is required for scope=project".into())
             })?;
-            let stats = get_project_stats(&state.pool, project_id).await?;
+            let stats = query_stats(&state.pool, "project_id", project_id).await?;
+            Ok(Json(stats))
+        }
+        "org" => {
+            let org_id = query.org_id.ok_or_else(|| {
+                AppError::BadRequest("orgId is required for scope=org".into())
+            })?;
+            let stats = query_stats(&state.pool, "org_id", org_id).await?;
+            Ok(Json(stats))
+        }
+        "network" => {
+            let stats = query_network_stats(&state.pool).await?;
             Ok(Json(stats))
         }
         _ => Err(AppError::BadRequest(format!(
-            "Invalid scope: '{}'. Must be: project",
+            "Invalid scope: '{}'. Must be: project, org, or network",
             query.scope
         ))),
     }
 }
 
-async fn get_project_stats(
+/// Query stats scoped by a column (project_id or org_id).
+async fn query_stats(
     pool: &sqlx::PgPool,
-    project_id: Uuid,
+    scope_column: &str,
+    scope_id: Uuid,
 ) -> Result<ExecutionStats, AppError> {
-    let stats = sqlx::query_as::<_, ExecutionStats>(
+    // Build the query dynamically based on scope column.
+    // Safe: scope_column is only ever "project_id" or "org_id" from our match.
+    let sql = format!(
         r#"
         SELECT
-            COALESCE((SELECT COUNT(*) FROM tasks WHERE project_id = $1), 0) as total_tasks,
-            COALESCE((SELECT COUNT(*) FROM tasks WHERE project_id = $1 AND status = 'pending'), 0) as pending_tasks,
-            COALESCE((SELECT COUNT(*) FROM tasks WHERE project_id = $1 AND status = 'ready'), 0) as ready_tasks,
-            COALESCE((SELECT COUNT(*) FROM tasks WHERE project_id = $1 AND status = 'in_progress'), 0) as in_progress_tasks,
-            COALESCE((SELECT COUNT(*) FROM tasks WHERE project_id = $1 AND status = 'blocked'), 0) as blocked_tasks,
-            COALESCE((SELECT COUNT(*) FROM tasks WHERE project_id = $1 AND status = 'done'), 0) as done_tasks,
-            COALESCE((SELECT COUNT(*) FROM tasks WHERE project_id = $1 AND status = 'failed'), 0) as failed_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1), 0) as total_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'pending'), 0) as pending_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'ready'), 0) as ready_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'in_progress'), 0) as in_progress_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'blocked'), 0) as blocked_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'done'), 0) as done_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'failed'), 0) as failed_tasks,
             CASE
-                WHEN (SELECT COUNT(*) FROM tasks WHERE project_id = $1) = 0 THEN 0.0::float8
+                WHEN (SELECT COUNT(*) FROM tasks WHERE {col} = $1) = 0 THEN 0.0::float8
                 ELSE (ROUND(
-                    (SELECT COUNT(*) FROM tasks WHERE project_id = $1 AND status = 'done')::numeric /
-                    (SELECT COUNT(*) FROM tasks WHERE project_id = $1)::numeric * 100, 1
+                    (SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'done')::numeric /
+                    (SELECT COUNT(*) FROM tasks WHERE {col} = $1)::numeric * 100, 1
                 ))::float8
             END as completion_percentage,
-            COALESCE((SELECT SUM(total_input_tokens + total_output_tokens)::int8 FROM sessions WHERE project_id = $1), 0) as total_tokens,
-            COALESCE((SELECT COUNT(*) FROM messages WHERE project_id = $1), 0) as total_messages,
-            COALESCE((SELECT COUNT(*) FROM project_agents WHERE project_id = $1), 0) as total_agents,
-            COALESCE((SELECT COUNT(*) FROM sessions WHERE project_id = $1), 0) as total_sessions,
-            COALESCE((SELECT SUM(EXTRACT(EPOCH FROM (ended_at - started_at)))::float8 FROM sessions WHERE project_id = $1 AND ended_at IS NOT NULL), 0)::float8 as total_time_seconds,
+            COALESCE((SELECT SUM(total_input_tokens + total_output_tokens)::int8 FROM sessions WHERE {col} = $1), 0) as total_tokens,
+            COALESCE((SELECT COUNT(*) FROM messages WHERE {col} = $1), 0) as total_messages,
+            COALESCE((SELECT COUNT(*) FROM project_agents WHERE {col} = $1), 0) as total_agents,
+            COALESCE((SELECT COUNT(*) FROM sessions WHERE {col} = $1), 0) as total_sessions,
+            COALESCE((SELECT SUM(EXTRACT(EPOCH FROM (ended_at - started_at)))::float8 FROM sessions WHERE {col} = $1 AND ended_at IS NOT NULL), 0)::float8 as total_time_seconds,
             COALESCE((
                 SELECT SUM(
                     COALESCE((elem->>'linesAdded')::bigint, 0) + COALESCE((elem->>'linesRemoved')::bigint, 0)
                 )::int8
                 FROM tasks
                 CROSS JOIN LATERAL jsonb_array_elements(COALESCE(files_changed, '[]'::jsonb)) AS elem
-                WHERE tasks.project_id = $1 AND files_changed IS NOT NULL AND jsonb_typeof(files_changed) = 'array'
+                WHERE tasks.{col} = $1 AND files_changed IS NOT NULL AND jsonb_typeof(files_changed) = 'array'
             ), 0) as lines_changed,
-            COALESCE((SELECT COUNT(*) FROM specs WHERE project_id = $1), 0) as total_specs
+            COALESCE((SELECT COUNT(*) FROM specs WHERE {col} = $1), 0) as total_specs
+        "#,
+        col = scope_column
+    );
+
+    let stats = sqlx::query_as::<_, ExecutionStats>(&sql)
+        .bind(scope_id)
+        .fetch_one(pool)
+        .await?;
+
+    Ok(stats)
+}
+
+/// Query stats across the entire network (no scope filter).
+async fn query_network_stats(pool: &sqlx::PgPool) -> Result<ExecutionStats, AppError> {
+    let stats = sqlx::query_as::<_, ExecutionStats>(
+        r#"
+        SELECT
+            COALESCE((SELECT COUNT(*) FROM tasks), 0) as total_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE status = 'pending'), 0) as pending_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE status = 'ready'), 0) as ready_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE status = 'in_progress'), 0) as in_progress_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE status = 'blocked'), 0) as blocked_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE status = 'done'), 0) as done_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE status = 'failed'), 0) as failed_tasks,
+            CASE
+                WHEN (SELECT COUNT(*) FROM tasks) = 0 THEN 0.0::float8
+                ELSE (ROUND(
+                    (SELECT COUNT(*) FROM tasks WHERE status = 'done')::numeric /
+                    (SELECT COUNT(*) FROM tasks)::numeric * 100, 1
+                ))::float8
+            END as completion_percentage,
+            COALESCE((SELECT SUM(total_input_tokens + total_output_tokens)::int8 FROM sessions), 0) as total_tokens,
+            COALESCE((SELECT COUNT(*) FROM messages), 0) as total_messages,
+            COALESCE((SELECT COUNT(*) FROM project_agents), 0) as total_agents,
+            COALESCE((SELECT COUNT(*) FROM sessions), 0) as total_sessions,
+            COALESCE((SELECT SUM(EXTRACT(EPOCH FROM (ended_at - started_at)))::float8 FROM sessions WHERE ended_at IS NOT NULL), 0)::float8 as total_time_seconds,
+            COALESCE((
+                SELECT SUM(
+                    COALESCE((elem->>'linesAdded')::bigint, 0) + COALESCE((elem->>'linesRemoved')::bigint, 0)
+                )::int8
+                FROM tasks
+                CROSS JOIN LATERAL jsonb_array_elements(COALESCE(files_changed, '[]'::jsonb)) AS elem
+                WHERE files_changed IS NOT NULL AND jsonb_typeof(files_changed) = 'array'
+            ), 0) as lines_changed,
+            COALESCE((SELECT COUNT(*) FROM specs), 0) as total_specs
         "#,
     )
-    .bind(project_id)
     .fetch_one(pool)
     .await?;
 
