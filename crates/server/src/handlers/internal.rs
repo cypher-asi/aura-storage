@@ -128,3 +128,18 @@ pub async fn update_agent_status(
 
     Ok(Json(agent))
 }
+
+pub async fn get_project_agent_count(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Path(project_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM project_agents WHERE project_id = $1",
+    )
+    .bind(project_id)
+    .fetch_one(&state.pool)
+    .await?;
+
+    Ok(Json(serde_json::json!({ "count": count })))
+}
