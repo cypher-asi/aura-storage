@@ -17,12 +17,13 @@ pub async fn create(
 
     let spec = sqlx::query_as::<_, Spec>(
         r#"
-        INSERT INTO specs (project_id, created_by, title, order_index, markdown_contents)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO specs (project_id, org_id, created_by, title, order_index, markdown_contents)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
         "#,
     )
     .bind(project_id)
+    .bind(input.org_id)
     .bind(created_by)
     .bind(input.title.trim())
     .bind(input.order_index)

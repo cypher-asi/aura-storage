@@ -7,6 +7,7 @@ use uuid::Uuid;
 pub struct Spec {
     pub id: Uuid,
     pub project_id: Uuid,
+    pub org_id: Option<Uuid>,
     pub created_by: Uuid,
     pub title: String,
     pub order_index: i32,
@@ -18,6 +19,7 @@ pub struct Spec {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateSpecRequest {
+    pub org_id: Option<Uuid>,
     pub title: String,
     pub order_index: i32,
     pub markdown_contents: String,

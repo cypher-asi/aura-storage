@@ -22,15 +22,16 @@ pub async fn create(
 
     let message = sqlx::query_as::<_, Message>(
         r#"
-        INSERT INTO messages (session_id, project_agent_id, project_id, created_by, role, content,
+        INSERT INTO messages (session_id, project_agent_id, project_id, org_id, created_by, role, content,
                             content_blocks, input_tokens, output_tokens, thinking, thinking_duration_ms)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING *
         "#,
     )
     .bind(session_id)
     .bind(input.project_agent_id)
     .bind(input.project_id)
+    .bind(input.org_id)
     .bind(input.created_by)
     .bind(&input.role)
     .bind(&input.content)

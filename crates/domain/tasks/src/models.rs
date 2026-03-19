@@ -7,6 +7,7 @@ use uuid::Uuid;
 pub struct Task {
     pub id: Uuid,
     pub project_id: Uuid,
+    pub org_id: Option<Uuid>,
     pub spec_id: Uuid,
     pub created_by: Uuid,
     pub title: String,
@@ -29,6 +30,7 @@ pub struct Task {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateTaskRequest {
+    pub org_id: Option<Uuid>,
     pub spec_id: Uuid,
     pub title: String,
     pub description: Option<String>,

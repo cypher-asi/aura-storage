@@ -7,6 +7,7 @@ use uuid::Uuid;
 pub struct ProjectAgent {
     pub id: Uuid,
     pub project_id: Uuid,
+    pub org_id: Option<Uuid>,
     pub agent_id: Uuid,
     pub created_by: Uuid,
     pub status: String,
@@ -21,6 +22,7 @@ pub struct ProjectAgent {
 #[serde(rename_all = "camelCase")]
 pub struct CreateProjectAgentRequest {
     pub agent_id: Uuid,
+    pub org_id: Option<Uuid>,
     pub model: Option<String>,
 }
 

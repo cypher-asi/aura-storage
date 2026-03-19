@@ -22,12 +22,13 @@ pub async fn create(
 
     let entry = sqlx::query_as::<_, LogEntry>(
         r#"
-        INSERT INTO log_entries (project_id, project_agent_id, created_by, level, message, metadata)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO log_entries (project_id, org_id, project_agent_id, created_by, level, message, metadata)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *
         "#,
     )
     .bind(project_id)
+    .bind(input.org_id)
     .bind(input.project_agent_id)
     .bind(input.created_by)
     .bind(&input.level)

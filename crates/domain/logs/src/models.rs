@@ -7,6 +7,7 @@ use uuid::Uuid;
 pub struct LogEntry {
     pub id: Uuid,
     pub project_id: Uuid,
+    pub org_id: Option<Uuid>,
     pub project_agent_id: Option<Uuid>,
     pub created_by: Option<Uuid>,
     pub level: String,
@@ -18,6 +19,7 @@ pub struct LogEntry {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateLogEntryRequest {
+    pub org_id: Option<Uuid>,
     pub project_agent_id: Option<Uuid>,
     pub created_by: Option<Uuid>,
     pub level: String,

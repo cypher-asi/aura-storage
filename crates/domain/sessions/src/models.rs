@@ -8,6 +8,7 @@ pub struct Session {
     pub id: Uuid,
     pub project_agent_id: Uuid,
     pub project_id: Uuid,
+    pub org_id: Option<Uuid>,
     pub created_by: Uuid,
     pub model: Option<String>,
     pub status: String,
@@ -23,6 +24,7 @@ pub struct Session {
 #[serde(rename_all = "camelCase")]
 pub struct CreateSessionRequest {
     pub project_id: Uuid,
+    pub org_id: Option<Uuid>,
     pub model: Option<String>,
 }
 

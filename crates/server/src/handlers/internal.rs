@@ -16,6 +16,7 @@ use crate::state::AppState;
 pub struct InternalCreateSessionRequest {
     pub project_agent_id: Uuid,
     pub project_id: Uuid,
+    pub org_id: Option<Uuid>,
     pub created_by: Uuid,
     pub model: Option<String>,
 }
@@ -26,6 +27,7 @@ pub struct InternalCreateMessageRequest {
     pub session_id: Uuid,
     pub project_agent_id: Uuid,
     pub project_id: Uuid,
+    pub org_id: Option<Uuid>,
     pub created_by: Option<Uuid>,
     pub role: String,
     pub content: String,
@@ -40,6 +42,7 @@ pub struct InternalCreateMessageRequest {
 #[serde(rename_all = "camelCase")]
 pub struct InternalCreateLogRequest {
     pub project_id: Uuid,
+    pub org_id: Option<Uuid>,
     pub project_agent_id: Option<Uuid>,
     pub created_by: Option<Uuid>,
     pub level: String,
@@ -54,6 +57,7 @@ pub async fn create_session(
 ) -> Result<Json<session_models::Session>, AppError> {
     let req = session_models::CreateSessionRequest {
         project_id: input.project_id,
+        org_id: input.org_id,
         model: input.model,
     };
     let session = session_repo::create(&state.pool, input.project_agent_id, input.created_by, &req).await?;
@@ -76,6 +80,7 @@ pub async fn create_message(
     let req = msg_models::CreateMessageRequest {
         project_agent_id: input.project_agent_id,
         project_id: input.project_id,
+        org_id: input.org_id,
         created_by: input.created_by,
         role: input.role,
         content: input.content,
@@ -95,6 +100,7 @@ pub async fn create_log(
     Json(input): Json<InternalCreateLogRequest>,
 ) -> Result<Json<log_models::LogEntry>, AppError> {
     let req = log_models::CreateLogEntryRequest {
+        org_id: input.org_id,
         project_agent_id: input.project_agent_id,
         created_by: input.created_by,
         level: input.level,

@@ -9,6 +9,7 @@ pub struct Message {
     pub session_id: Uuid,
     pub project_agent_id: Uuid,
     pub project_id: Uuid,
+    pub org_id: Option<Uuid>,
     pub created_by: Option<Uuid>,
     pub role: String,
     pub content: String,
@@ -25,6 +26,7 @@ pub struct Message {
 pub struct CreateMessageRequest {
     pub project_agent_id: Uuid,
     pub project_id: Uuid,
+    pub org_id: Option<Uuid>,
     pub created_by: Option<Uuid>,
     pub role: String,
     pub content: String,

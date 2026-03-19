@@ -15,12 +15,13 @@ pub async fn create(
 ) -> Result<ProjectAgent, AppError> {
     let project_agent = sqlx::query_as::<_, ProjectAgent>(
         r#"
-        INSERT INTO project_agents (project_id, agent_id, created_by, model)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO project_agents (project_id, org_id, agent_id, created_by, model)
+        VALUES ($1, $2, $3, $4, $5)
         RETURNING *
         "#,
     )
     .bind(project_id)
+    .bind(input.org_id)
     .bind(input.agent_id)
     .bind(created_by)
     .bind(&input.model)

@@ -15,13 +15,14 @@ pub async fn create(
 ) -> Result<Session, AppError> {
     let session = sqlx::query_as::<_, Session>(
         r#"
-        INSERT INTO sessions (project_agent_id, project_id, created_by, model)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO sessions (project_agent_id, project_id, org_id, created_by, model)
+        VALUES ($1, $2, $3, $4, $5)
         RETURNING *
         "#,
     )
     .bind(project_agent_id)
     .bind(input.project_id)
+    .bind(input.org_id)
     .bind(created_by)
     .bind(&input.model)
     .fetch_one(pool)

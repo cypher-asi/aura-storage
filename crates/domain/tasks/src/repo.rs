@@ -22,13 +22,14 @@ pub async fn create(
 
     let task = sqlx::query_as::<_, Task>(
         r#"
-        INSERT INTO tasks (project_id, spec_id, created_by, title, description, order_index,
+        INSERT INTO tasks (project_id, org_id, spec_id, created_by, title, description, order_index,
                           dependency_task_ids, parent_task_id, assigned_project_agent_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
         "#,
     )
     .bind(project_id)
+    .bind(input.org_id)
     .bind(input.spec_id)
     .bind(created_by)
     .bind(input.title.trim())
