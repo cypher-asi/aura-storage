@@ -405,7 +405,7 @@ On app load: fetch projects from aura-network, then fetch execution data from au
 2. Create session:         POST /internal/sessions
 3. Write messages:         POST /internal/messages (per LLM call)
 4. Write logs:             POST /internal/logs
-5. Post activity:          POST aura-network /internal/activity (feed post)
+5. Post to feed:            POST aura-network /internal/posts
 ```
 
 Use `X-Internal-Token` for aura-storage internal endpoints. Use the user's JWT for aura-network activity posts and credit debits.
