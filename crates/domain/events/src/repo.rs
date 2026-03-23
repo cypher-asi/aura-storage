@@ -6,7 +6,9 @@ use aura_storage_core::AppError;
 use crate::models::{CreateEventRequest, SessionEvent};
 
 pub async fn create(pool: &PgPool, input: &CreateEventRequest) -> Result<SessionEvent, AppError> {
-    crate::models::validate_event_type(&input.event_type)?;
+    // Event type validation relaxed while system shape is being figured out.
+    // Valid types are listed in models::VALID_EVENT_TYPES for reference.
+    // crate::models::validate_event_type(&input.event_type)?;
 
     if let Some(ref sender) = input.sender {
         if sender != "user" && sender != "agent" {
