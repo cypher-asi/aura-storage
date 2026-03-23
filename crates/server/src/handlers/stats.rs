@@ -86,43 +86,46 @@ async fn query_stats(
 
     // Build query with agent filter. $1 = scope_id, $2 = agent_id.
     // Safe: scope_column is only ever "project_id" or "org_id" from our match.
-    let af = "AND project_agent_id IN (SELECT id FROM project_agents WHERE agent_id = $2)";
+    // Tasks use assigned_project_agent_id, sessions/messages use project_agent_id.
+    let taf = "AND assigned_project_agent_id IN (SELECT id FROM project_agents WHERE agent_id = $2)";
+    let saf = "AND project_agent_id IN (SELECT id FROM project_agents WHERE agent_id = $2)";
 
     let sql = format!(
         r#"
         SELECT
-            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 {af}), 0) as total_tasks,
-            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'pending' {af}), 0) as pending_tasks,
-            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'ready' {af}), 0) as ready_tasks,
-            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'in_progress' {af}), 0) as in_progress_tasks,
-            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'blocked' {af}), 0) as blocked_tasks,
-            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'done' {af}), 0) as done_tasks,
-            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'failed' {af}), 0) as failed_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 {taf}), 0) as total_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'pending' {taf}), 0) as pending_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'ready' {taf}), 0) as ready_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'in_progress' {taf}), 0) as in_progress_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'blocked' {taf}), 0) as blocked_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'done' {taf}), 0) as done_tasks,
+            COALESCE((SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'failed' {taf}), 0) as failed_tasks,
             CASE
-                WHEN (SELECT COUNT(*) FROM tasks WHERE {col} = $1 {af}) = 0 THEN 0.0::float8
+                WHEN (SELECT COUNT(*) FROM tasks WHERE {col} = $1 {taf}) = 0 THEN 0.0::float8
                 ELSE (ROUND(
-                    (SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'done' {af})::numeric /
-                    (SELECT COUNT(*) FROM tasks WHERE {col} = $1 {af})::numeric * 100, 1
+                    (SELECT COUNT(*) FROM tasks WHERE {col} = $1 AND status = 'done' {taf})::numeric /
+                    (SELECT COUNT(*) FROM tasks WHERE {col} = $1 {taf})::numeric * 100, 1
                 ))::float8
             END as completion_percentage,
-            COALESCE((SELECT SUM(total_input_tokens + total_output_tokens)::int8 FROM sessions WHERE {col} = $1 {af}), 0) as total_tokens,
-            COALESCE((SELECT COUNT(*) FROM messages WHERE {col} = $1 {af}), 0) as total_messages,
+            COALESCE((SELECT SUM(total_input_tokens + total_output_tokens)::int8 FROM sessions WHERE {col} = $1 {saf}), 0) as total_tokens,
+            COALESCE((SELECT COUNT(*) FROM messages WHERE {col} = $1 {saf}), 0) as total_messages,
             COALESCE((SELECT COUNT(*) FROM project_agents WHERE {col} = $1), 0) as total_agents,
-            COALESCE((SELECT COUNT(*) FROM sessions WHERE {col} = $1 {af}), 0) as total_sessions,
-            COALESCE((SELECT SUM(EXTRACT(EPOCH FROM (ended_at - started_at)))::float8 FROM sessions WHERE {col} = $1 AND ended_at IS NOT NULL {af}), 0)::float8 as total_time_seconds,
+            COALESCE((SELECT COUNT(*) FROM sessions WHERE {col} = $1 {saf}), 0) as total_sessions,
+            COALESCE((SELECT SUM(EXTRACT(EPOCH FROM (ended_at - started_at)))::float8 FROM sessions WHERE {col} = $1 AND ended_at IS NOT NULL {saf}), 0)::float8 as total_time_seconds,
             COALESCE((
                 SELECT SUM(
                     COALESCE((elem->>'linesAdded')::bigint, 0) + COALESCE((elem->>'linesRemoved')::bigint, 0)
                 )::int8
                 FROM tasks
                 CROSS JOIN LATERAL jsonb_array_elements(COALESCE(files_changed, '[]'::jsonb)) AS elem
-                WHERE tasks.{col} = $1 AND files_changed IS NOT NULL AND jsonb_typeof(files_changed) = 'array' {af}
+                WHERE tasks.{col} = $1 AND files_changed IS NOT NULL AND jsonb_typeof(files_changed) = 'array' {taf}
             ), 0) as lines_changed,
             COALESCE((SELECT COUNT(*) FROM specs WHERE {col} = $1), 0) as total_specs,
-            COALESCE((SELECT COUNT(DISTINCT created_by) FROM sessions WHERE {col} = $1 {af}), 0) as contributors
+            COALESCE((SELECT COUNT(DISTINCT created_by) FROM sessions WHERE {col} = $1 {saf}), 0) as contributors
         "#,
         col = scope_column,
-        af = af,
+        taf = taf,
+        saf = saf,
     );
 
     let stats = sqlx::query_as::<_, ExecutionStats>(&sql)
