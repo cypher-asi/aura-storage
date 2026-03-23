@@ -218,6 +218,32 @@ Messages are the LLM conversation history within a session.
 
 `createdBy` is nullable — omit for system messages. `role` determines the message type (user prompt, assistant response, or system context). `thinking` and `thinkingDurationMs` store Claude's extended thinking content and duration.
 
+### Session Events
+
+Linear stream of typed events per session. Replaces the messages model with a more flexible event-based approach.
+
+| Method | Path | Description | Auth |
+|---|---|---|---|
+| POST | `/api/sessions/:sessionId/events` | Create event | JWT |
+| GET | `/api/sessions/:sessionId/events` | List events. Params: `?limit=&offset=` | JWT |
+
+#### Create Event Body
+
+```json
+{
+  "sessionId": "uuid",
+  "userId": "uuid (optional)",
+  "agentId": "uuid (optional)",
+  "sender": "user | agent",
+  "projectId": "uuid (optional)",
+  "orgId": "uuid (optional)",
+  "type": "delta | tool_call | task_completed | ... (any string)",
+  "content": {"text": "Hello world"}
+}
+```
+
+`sender` must be "user" or "agent". `type` accepts any string (validation relaxed during development). `content` is freeform JSONB.
+
 ### Log Entries
 
 Structured logs for project agent activity.
@@ -249,6 +275,8 @@ Aggregated execution stats at project, org, or network level.
 | GET | `/api/stats?scope=org&orgId=...` | Org-level stats | JWT |
 | GET | `/api/stats?scope=network` | Network-wide stats | JWT |
 
+Optional filter: `?agentId=` to filter stats by a specific agent (project and org scopes).
+
 Returns:
 ```json
 {
@@ -266,7 +294,8 @@ Returns:
   "totalSessions": 8,
   "totalTimeSeconds": 3600,
   "linesChanged": 450,
-  "totalSpecs": 4
+  "totalSpecs": 4,
+  "contributors": 2
 }
 ```
 
@@ -280,6 +309,7 @@ Authenticated via `X-Internal-Token` header. Called by aura-swarm and other back
 |---|---|---|
 | POST | `/internal/sessions` | Create session (with createdBy in body) |
 | POST | `/internal/messages` | Write message |
+| POST | `/internal/events` | Write session event |
 | POST | `/internal/logs` | Write log entry |
 | POST | `/internal/project-agents/:id/status` | Update agent status |
 
