@@ -11,6 +11,7 @@ members = [
     "crates/domain/sessions",
     "crates/domain/messages",
     "crates/domain/logs",
+    "crates/domain/events",
 ]
 
 [workspace.dependencies]
@@ -41,3 +42,4 @@ aura-storage-tasks = { path = "crates/domain/tasks" }
 aura-storage-sessions = { path = "crates/domain/sessions" }
 aura-storage-messages = { path = "crates/domain/messages" }
 aura-storage-logs = { path = "crates/domain/logs" }
+aura-storage-events = { path = "crates/domain/events" }

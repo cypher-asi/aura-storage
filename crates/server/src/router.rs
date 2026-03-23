@@ -8,30 +8,88 @@ pub fn create_router() -> Router<AppState> {
     Router::new()
         .route("/health", get(handlers::health))
         // Project Agents
-        .route("/api/projects/:projectId/agents", post(handlers::project_agents::create_project_agent).get(handlers::project_agents::list_project_agents))
-        .route("/api/project-agents/:id", get(handlers::project_agents::get_project_agent).put(handlers::project_agents::update_project_agent).delete(handlers::project_agents::delete_project_agent))
+        .route(
+            "/api/projects/:projectId/agents",
+            post(handlers::project_agents::create_project_agent)
+                .get(handlers::project_agents::list_project_agents),
+        )
+        .route(
+            "/api/project-agents/:id",
+            get(handlers::project_agents::get_project_agent)
+                .put(handlers::project_agents::update_project_agent)
+                .delete(handlers::project_agents::delete_project_agent),
+        )
         // Specs
-        .route("/api/projects/:projectId/specs", post(handlers::specs::create_spec).get(handlers::specs::list_specs))
-        .route("/api/specs/:id", get(handlers::specs::get_spec).put(handlers::specs::update_spec).delete(handlers::specs::delete_spec))
+        .route(
+            "/api/projects/:projectId/specs",
+            post(handlers::specs::create_spec).get(handlers::specs::list_specs),
+        )
+        .route(
+            "/api/specs/:id",
+            get(handlers::specs::get_spec)
+                .put(handlers::specs::update_spec)
+                .delete(handlers::specs::delete_spec),
+        )
         // Tasks
-        .route("/api/projects/:projectId/tasks", post(handlers::tasks::create_task).get(handlers::tasks::list_tasks))
-        .route("/api/tasks/:id", get(handlers::tasks::get_task).put(handlers::tasks::update_task).delete(handlers::tasks::delete_task))
-        .route("/api/tasks/:id/transition", post(handlers::tasks::transition_task))
+        .route(
+            "/api/projects/:projectId/tasks",
+            post(handlers::tasks::create_task).get(handlers::tasks::list_tasks),
+        )
+        .route(
+            "/api/tasks/:id",
+            get(handlers::tasks::get_task)
+                .put(handlers::tasks::update_task)
+                .delete(handlers::tasks::delete_task),
+        )
+        .route(
+            "/api/tasks/:id/transition",
+            post(handlers::tasks::transition_task),
+        )
         // Sessions
-        .route("/api/project-agents/:projectAgentId/sessions", post(handlers::sessions::create_session).get(handlers::sessions::list_sessions))
-        .route("/api/sessions/:id", get(handlers::sessions::get_session).put(handlers::sessions::update_session))
+        .route(
+            "/api/project-agents/:projectAgentId/sessions",
+            post(handlers::sessions::create_session).get(handlers::sessions::list_sessions),
+        )
+        .route(
+            "/api/sessions/:id",
+            get(handlers::sessions::get_session).put(handlers::sessions::update_session),
+        )
         // Messages
-        .route("/api/sessions/:sessionId/messages", post(handlers::messages::create_message).get(handlers::messages::list_messages))
+        .route(
+            "/api/sessions/:sessionId/messages",
+            post(handlers::messages::create_message).get(handlers::messages::list_messages),
+        )
+        // Events
+        .route(
+            "/api/sessions/:sessionId/events",
+            post(handlers::events::create_event).get(handlers::events::list_events),
+        )
         // Stats
         .route("/api/stats", get(handlers::stats::get_stats))
         // Log Entries
-        .route("/api/projects/:projectId/logs", post(handlers::logs::create_log_entry).get(handlers::logs::list_log_entries))
+        .route(
+            "/api/projects/:projectId/logs",
+            post(handlers::logs::create_log_entry).get(handlers::logs::list_log_entries),
+        )
         // Internal (X-Internal-Token auth)
-        .route("/internal/sessions", post(handlers::internal::create_session))
-        .route("/internal/messages", post(handlers::internal::create_message))
+        .route(
+            "/internal/sessions",
+            post(handlers::internal::create_session),
+        )
+        .route(
+            "/internal/messages",
+            post(handlers::internal::create_message),
+        )
+        .route("/internal/events", post(handlers::internal::create_event))
         .route("/internal/logs", post(handlers::internal::create_log))
-        .route("/internal/project-agents/:id/status", post(handlers::internal::update_agent_status))
-        .route("/internal/projects/:projectId/agents/count", get(handlers::internal::get_project_agent_count))
+        .route(
+            "/internal/project-agents/:id/status",
+            post(handlers::internal::update_agent_status),
+        )
+        .route(
+            "/internal/projects/:projectId/agents/count",
+            get(handlers::internal::get_project_agent_count),
+        )
         // WebSocket
         .route("/ws/events", get(handlers::ws::ws_events))
 }

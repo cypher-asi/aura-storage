@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use aura_storage_auth::InternalAuth;
 use aura_storage_core::AppError;
+use aura_storage_events::{models as event_models, repo as event_repo};
 use aura_storage_logs::{models as log_models, repo as log_repo};
 use aura_storage_messages::{models as msg_models, repo as msg_repo};
 use aura_storage_project_agents::{models as pa_models, repo as pa_repo};
@@ -60,14 +61,18 @@ pub async fn create_session(
         org_id: input.org_id,
         model: input.model,
     };
-    let session = session_repo::create(&state.pool, input.project_agent_id, input.created_by, &req).await?;
+    let session =
+        session_repo::create(&state.pool, input.project_agent_id, input.created_by, &req).await?;
 
-    let _ = state.events_tx.send(serde_json::json!({
-        "type": "session.started",
-        "sessionId": session.id,
-        "projectAgentId": session.project_agent_id,
-        "projectId": session.project_id,
-    }).to_string());
+    let _ = state.events_tx.send(
+        serde_json::json!({
+            "type": "session.started",
+            "sessionId": session.id,
+            "projectAgentId": session.project_agent_id,
+            "projectId": session.project_id,
+        })
+        .to_string(),
+    );
 
     Ok(Json(session))
 }
@@ -119,14 +124,26 @@ pub async fn update_agent_status(
 ) -> Result<Json<pa_models::ProjectAgent>, AppError> {
     let agent = pa_repo::update_status(&state.pool, id, &input).await?;
 
-    let _ = state.events_tx.send(serde_json::json!({
-        "type": "project_agent.status_changed",
-        "projectAgentId": agent.id,
-        "projectId": agent.project_id,
-        "status": agent.status,
-    }).to_string());
+    let _ = state.events_tx.send(
+        serde_json::json!({
+            "type": "project_agent.status_changed",
+            "projectAgentId": agent.id,
+            "projectId": agent.project_id,
+            "status": agent.status,
+        })
+        .to_string(),
+    );
 
     Ok(Json(agent))
+}
+
+pub async fn create_event(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Json(input): Json<event_models::CreateEventRequest>,
+) -> Result<Json<event_models::SessionEvent>, AppError> {
+    let event = event_repo::create(&state.pool, &input).await?;
+    Ok(Json(event))
 }
 
 pub async fn get_project_agent_count(
@@ -134,12 +151,11 @@ pub async fn get_project_agent_count(
     State(state): State<AppState>,
     Path(project_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM project_agents WHERE project_id = $1",
-    )
-    .bind(project_id)
-    .fetch_one(&state.pool)
-    .await?;
+    let count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM project_agents WHERE project_id = $1")
+            .bind(project_id)
+            .fetch_one(&state.pool)
+            .await?;
 
     Ok(Json(serde_json::json!({ "count": count })))
 }

@@ -13,6 +13,7 @@ aura-storage-tasks = { workspace = true }
 aura-storage-sessions = { workspace = true }
 aura-storage-messages = { workspace = true }
 aura-storage-logs = { workspace = true }
+aura-storage-events = { workspace = true }
 axum = { workspace = true }
 chrono = { workspace = true }
 serde = { workspace = true }
