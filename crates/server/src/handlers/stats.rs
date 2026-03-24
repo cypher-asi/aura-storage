@@ -29,7 +29,7 @@ pub struct ExecutionStats {
     pub failed_tasks: i64,
     pub completion_percentage: f64,
     pub total_tokens: i64,
-    pub total_messages: i64,
+    pub total_events: i64,
     pub total_agents: i64,
     pub total_sessions: i64,
     pub total_time_seconds: f64,
@@ -85,7 +85,7 @@ async fn query_stats(
 
     // Build query with agent filter. $1 = scope_id, $2 = agent_id.
     // Safe: scope_column is only ever "project_id" or "org_id" from our match.
-    // Tasks use assigned_project_agent_id, sessions/messages use project_agent_id.
+    // Tasks use assigned_project_agent_id, sessions/events use project_agent_id.
     let taf =
         "AND assigned_project_agent_id IN (SELECT id FROM project_agents WHERE agent_id = $2)";
     let saf = "AND project_agent_id IN (SELECT id FROM project_agents WHERE agent_id = $2)";
@@ -108,7 +108,7 @@ async fn query_stats(
                 ))::float8
             END as completion_percentage,
             COALESCE((SELECT SUM(total_input_tokens + total_output_tokens)::int8 FROM sessions WHERE {col} = $1 {saf}), 0) as total_tokens,
-            COALESCE((SELECT COUNT(*) FROM messages WHERE {col} = $1 {saf}), 0) as total_messages,
+            COALESCE((SELECT COUNT(*) FROM session_events WHERE {col} = $1 {saf}), 0) as total_events,
             COALESCE((SELECT COUNT(*) FROM project_agents WHERE {col} = $1), 0) as total_agents,
             COALESCE((SELECT COUNT(*) FROM sessions WHERE {col} = $1 {saf}), 0) as total_sessions,
             COALESCE((SELECT SUM(EXTRACT(EPOCH FROM (ended_at - started_at)))::float8 FROM sessions WHERE {col} = $1 AND ended_at IS NOT NULL {saf}), 0)::float8 as total_time_seconds,
@@ -161,7 +161,7 @@ async fn query_stats_unfiltered(
                 ))::float8
             END as completion_percentage,
             COALESCE((SELECT SUM(total_input_tokens + total_output_tokens)::int8 FROM sessions WHERE {col} = $1), 0) as total_tokens,
-            COALESCE((SELECT COUNT(*) FROM messages WHERE {col} = $1), 0) as total_messages,
+            COALESCE((SELECT COUNT(*) FROM session_events WHERE {col} = $1), 0) as total_events,
             COALESCE((SELECT COUNT(*) FROM project_agents WHERE {col} = $1), 0) as total_agents,
             COALESCE((SELECT COUNT(*) FROM sessions WHERE {col} = $1), 0) as total_sessions,
             COALESCE((SELECT SUM(EXTRACT(EPOCH FROM (ended_at - started_at)))::float8 FROM sessions WHERE {col} = $1 AND ended_at IS NOT NULL), 0)::float8 as total_time_seconds,
@@ -210,7 +210,7 @@ async fn query_network_stats(
                 ))::float8
             END as completion_percentage,
             COALESCE((SELECT SUM(total_input_tokens + total_output_tokens)::int8 FROM sessions), 0) as total_tokens,
-            COALESCE((SELECT COUNT(*) FROM messages), 0) as total_messages,
+            COALESCE((SELECT COUNT(*) FROM session_events), 0) as total_events,
             COALESCE((SELECT COUNT(*) FROM project_agents), 0) as total_agents,
             COALESCE((SELECT COUNT(*) FROM sessions), 0) as total_sessions,
             COALESCE((SELECT SUM(EXTRACT(EPOCH FROM (ended_at - started_at)))::float8 FROM sessions WHERE ended_at IS NOT NULL), 0)::float8 as total_time_seconds,
