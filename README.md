@@ -6,7 +6,7 @@
 
 ## Overview
 
-aura-storage stores all project execution data for the AURA platform — specs, tasks, sessions, messages, project agents, and log entries. All AURA clients (desktop, web, mobile) and aura-swarm (cloud agent orchestration) connect to this service for execution state.
+aura-storage stores all project execution data for the AURA platform — specs, tasks, sessions, events, project agents, and log entries. All AURA clients (desktop, web, mobile) and aura-swarm (cloud agent orchestration) connect to this service for execution state.
 
 Projects themselves live in [aura-network](https://github.com/cypher-asi/aura-network) (the social layer). This service references project UUIDs from there. Together: aura-network owns "what exists", aura-storage owns "what happened".
 
@@ -79,10 +79,6 @@ Unlike aura-network, this service does **not** auto-create users. The `created_b
 ### SessionStatus
 
 `active` | `completed` | `failed` | `rolled_over`
-
-### MessageRole
-
-`user` | `assistant` | `system`
 
 ### LogLevel
 
@@ -190,37 +186,9 @@ Sessions represent a continuous agent execution context. Created per project age
 }
 ```
 
-### Messages
-
-Messages are the LLM conversation history within a session.
-
-| Method | Path | Description | Auth |
-|---|---|---|---|
-| POST | `/api/sessions/:sessionId/messages` | Create message | JWT |
-| GET | `/api/sessions/:sessionId/messages` | List messages. Params: `?limit=&offset=` | JWT |
-
-#### Create Message Body
-
-```json
-{
-  "projectAgentId": "uuid",
-  "projectId": "uuid",
-  "createdBy": "uuid or null",
-  "role": "user | assistant | system",
-  "content": "Message text",
-  "contentBlocks": [{"type": "text", "text": "..."}],
-  "inputTokens": 500,
-  "outputTokens": 200,
-  "thinking": "Let me think about this...",
-  "thinkingDurationMs": 1500
-}
-```
-
-`createdBy` is nullable — omit for system messages. `role` determines the message type (user prompt, assistant response, or system context). `thinking` and `thinkingDurationMs` store Claude's extended thinking content and duration.
-
 ### Session Events
 
-Linear stream of typed events per session. Replaces the messages model with a more flexible event-based approach.
+Linear stream of typed events per session.
 
 | Method | Path | Description | Auth |
 |---|---|---|---|
@@ -289,7 +257,7 @@ Returns:
   "failedTasks": 2,
   "completionPercentage": 48.0,
   "totalTokens": 150000,
-  "totalMessages": 340,
+  "totalEvents": 340,
   "totalAgents": 3,
   "totalSessions": 8,
   "totalTimeSeconds": 3600,
@@ -308,7 +276,6 @@ Authenticated via `X-Internal-Token` header. Called by aura-swarm and other back
 | Method | Path | Description |
 |---|---|---|
 | POST | `/internal/sessions` | Create session (with createdBy in body) |
-| POST | `/internal/messages` | Write message |
 | POST | `/internal/events` | Write session event |
 | POST | `/internal/logs` | Write log entry |
 | POST | `/internal/project-agents/:id/status` | Update agent status |
@@ -322,21 +289,6 @@ Internal endpoints include fields that the public endpoints derive from path par
   "projectId": "uuid",
   "createdBy": "uuid",
   "model": "claude-opus-4-6"
-}
-```
-
-**Internal create message:**
-```json
-{
-  "sessionId": "uuid",
-  "projectAgentId": "uuid",
-  "projectId": "uuid",
-  "role": "assistant",
-  "content": "Message text",
-  "inputTokens": 500,
-  "outputTokens": 200,
-  "thinking": "Extended thinking content",
-  "thinkingDurationMs": 1500
 }
 ```
 
@@ -384,7 +336,7 @@ All request and response bodies use JSON with **camelCase** field names.
 
 Error codes: `NOT_FOUND` (404), `UNAUTHORIZED` (401), `FORBIDDEN` (403), `BAD_REQUEST` (400), `CONFLICT` (409), `INTERNAL` (500).
 
-**Pagination:** Messages and log entries support `?limit=` (default 50, max 100) and `?offset=` (default 0). Other list endpoints return all results.
+**Pagination:** Events and log entries support `?limit=` and `?offset=` (default 0). Other list endpoints return all results.
 
 ---
 
@@ -406,7 +358,7 @@ This service stores UUIDs that reference entities in aura-network. These are **n
 project (aura-network)
   +-- project_agent -> agent (aura-network)
   |     +-- session
-  |     |     +-- messages
+  |     |     +-- events
   |     +-- log_entries
   +-- specs
   +-- tasks -> spec, project_agent
@@ -421,7 +373,7 @@ project (aura-network)
 ```
 Auth:       zOS API (login) -> gets JWT
 Network:    aura-network (profiles, orgs, agents, feed, projects)
-Storage:    aura-storage (specs, tasks, sessions, messages, project agents, logs)
+Storage:    aura-storage (specs, tasks, sessions, events, project agents, logs)
 Billing:    zero-payments-server (credit balance, debit via JWT)
 Local:      RocksDB (terminal, filesystem, settings)
 ```
@@ -433,7 +385,7 @@ On app load: fetch projects from aura-network, then fetch execution data from au
 ```
 1. Update agent status:    POST /internal/project-agents/:id/status
 2. Create session:         POST /internal/sessions
-3. Write messages:         POST /internal/messages (per LLM call)
+3. Write events:           POST /internal/events (per LLM call)
 4. Write logs:             POST /internal/logs
 5. Post to feed:            POST aura-network /internal/posts
 ```
@@ -458,7 +410,7 @@ Same API as desktop — all endpoints are API-first. Authenticate via zOS, then 
 | **aura-storage-specs** | Spec management (requirements documents) |
 | **aura-storage-tasks** | Task management with status state machine |
 | **aura-storage-sessions** | Agent execution sessions |
-| **aura-storage-messages** | LLM conversation history |
+| **aura-storage-events** | Session events (typed event stream) |
 | **aura-storage-logs** | Structured log entries |
 
 ## License

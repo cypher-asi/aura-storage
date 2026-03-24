@@ -21,16 +21,13 @@ async fn main() {
         )
         .init();
 
-    let database_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set");
-    let auth0_domain = std::env::var("AUTH0_DOMAIN")
-        .expect("AUTH0_DOMAIN must be set");
-    let auth0_audience = std::env::var("AUTH0_AUDIENCE")
-        .expect("AUTH0_AUDIENCE must be set");
-    let cookie_secret = std::env::var("AUTH_COOKIE_SECRET")
-        .expect("AUTH_COOKIE_SECRET must be set");
-    let internal_token = std::env::var("INTERNAL_SERVICE_TOKEN")
-        .expect("INTERNAL_SERVICE_TOKEN must be set");
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let auth0_domain = std::env::var("AUTH0_DOMAIN").expect("AUTH0_DOMAIN must be set");
+    let auth0_audience = std::env::var("AUTH0_AUDIENCE").expect("AUTH0_AUDIENCE must be set");
+    let cookie_secret =
+        std::env::var("AUTH_COOKIE_SECRET").expect("AUTH_COOKIE_SECRET must be set");
+    let internal_token =
+        std::env::var("INTERNAL_SERVICE_TOKEN").expect("INTERNAL_SERVICE_TOKEN must be set");
     let port: u16 = std::env::var("PORT")
         .unwrap_or_else(|_| "3000".to_string())
         .parse()
@@ -94,9 +91,8 @@ async fn shutdown_signal() {
 
     #[cfg(unix)]
     {
-        let mut sigterm =
-            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-                .expect("Failed to install SIGTERM handler");
+        let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("Failed to install SIGTERM handler");
         tokio::select! {
             _ = ctrl_c => {},
             _ = sigterm.recv() => {},

@@ -14,17 +14,22 @@ pub async fn create_session(
     Path(project_agent_id): Path<Uuid>,
     Json(input): Json<models::CreateSessionRequest>,
 ) -> Result<Json<models::Session>, AppError> {
-    let created_by = auth.user_id.parse::<Uuid>()
+    let created_by = auth
+        .user_id
+        .parse::<Uuid>()
         .map_err(|_| AppError::BadRequest("Invalid user ID".into()))?;
 
     let session = repo::create(&state.pool, project_agent_id, created_by, &input).await?;
 
-    let _ = state.events_tx.send(serde_json::json!({
-        "type": "session.started",
-        "sessionId": session.id,
-        "projectAgentId": session.project_agent_id,
-        "projectId": session.project_id,
-    }).to_string());
+    let _ = state.events_tx.send(
+        serde_json::json!({
+            "type": "session.started",
+            "sessionId": session.id,
+            "projectAgentId": session.project_agent_id,
+            "projectId": session.project_id,
+        })
+        .to_string(),
+    );
 
     Ok(Json(session))
 }
@@ -56,13 +61,16 @@ pub async fn update_session(
     let session = repo::update(&state.pool, id, &input).await?;
 
     if input.status.is_some() {
-        let _ = state.events_tx.send(serde_json::json!({
-            "type": "session.status_changed",
-            "sessionId": session.id,
-            "projectAgentId": session.project_agent_id,
-            "projectId": session.project_id,
-            "status": session.status,
-        }).to_string());
+        let _ = state.events_tx.send(
+            serde_json::json!({
+                "type": "session.status_changed",
+                "sessionId": session.id,
+                "projectAgentId": session.project_agent_id,
+                "projectId": session.project_id,
+                "status": session.status,
+            })
+            .to_string(),
+        );
     }
 
     Ok(Json(session))

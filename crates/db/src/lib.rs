@@ -8,9 +8,7 @@ pub async fn create_pool(database_url: &str) -> Result<PgPool, sqlx::Error> {
         .await?;
 
     tracing::info!("Running database migrations...");
-    sqlx::migrate!("./migrations")
-        .run(&pool)
-        .await?;
+    sqlx::migrate!("./migrations").run(&pool).await?;
     tracing::info!("Migrations complete");
 
     Ok(pool)

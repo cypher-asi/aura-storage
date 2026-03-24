@@ -6,7 +6,7 @@ use aura_storage_auth::InternalAuth;
 use aura_storage_core::AppError;
 use aura_storage_events::{models as event_models, repo as event_repo};
 use aura_storage_logs::{models as log_models, repo as log_repo};
-use aura_storage_messages::{models as msg_models, repo as msg_repo};
+
 use aura_storage_project_agents::{models as pa_models, repo as pa_repo};
 use aura_storage_sessions::{models as session_models, repo as session_repo};
 
@@ -20,23 +20,6 @@ pub struct InternalCreateSessionRequest {
     pub org_id: Option<Uuid>,
     pub created_by: Uuid,
     pub model: Option<String>,
-}
-
-#[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InternalCreateMessageRequest {
-    pub session_id: Uuid,
-    pub project_agent_id: Uuid,
-    pub project_id: Uuid,
-    pub org_id: Option<Uuid>,
-    pub created_by: Option<Uuid>,
-    pub role: String,
-    pub content: String,
-    pub content_blocks: Option<serde_json::Value>,
-    pub input_tokens: Option<i32>,
-    pub output_tokens: Option<i32>,
-    pub thinking: Option<String>,
-    pub thinking_duration_ms: Option<i64>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -75,28 +58,6 @@ pub async fn create_session(
     );
 
     Ok(Json(session))
-}
-
-pub async fn create_message(
-    _auth: InternalAuth,
-    State(state): State<AppState>,
-    Json(input): Json<InternalCreateMessageRequest>,
-) -> Result<Json<msg_models::Message>, AppError> {
-    let req = msg_models::CreateMessageRequest {
-        project_agent_id: input.project_agent_id,
-        project_id: input.project_id,
-        org_id: input.org_id,
-        created_by: input.created_by,
-        role: input.role,
-        content: input.content,
-        content_blocks: input.content_blocks,
-        input_tokens: input.input_tokens,
-        output_tokens: input.output_tokens,
-        thinking: input.thinking,
-        thinking_duration_ms: input.thinking_duration_ms,
-    };
-    let message = msg_repo::create(&state.pool, input.session_id, &req).await?;
-    Ok(Json(message))
 }
 
 pub async fn create_log(

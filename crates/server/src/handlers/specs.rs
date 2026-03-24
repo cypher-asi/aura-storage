@@ -15,7 +15,9 @@ pub async fn create_spec(
     Path(project_id): Path<Uuid>,
     Json(input): Json<models::CreateSpecRequest>,
 ) -> Result<Json<models::Spec>, AppError> {
-    let created_by = auth.user_id.parse::<Uuid>()
+    let created_by = auth
+        .user_id
+        .parse::<Uuid>()
         .map_err(|_| AppError::BadRequest("Invalid user ID".into()))?;
 
     let spec = repo::create(&state.pool, project_id, created_by, &input).await?;

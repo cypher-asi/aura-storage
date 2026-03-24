@@ -21,7 +21,9 @@ pub async fn create_task(
     Path(project_id): Path<Uuid>,
     Json(input): Json<models::CreateTaskRequest>,
 ) -> Result<Json<models::Task>, AppError> {
-    let created_by = auth.user_id.parse::<Uuid>()
+    let created_by = auth
+        .user_id
+        .parse::<Uuid>()
         .map_err(|_| AppError::BadRequest("Invalid user ID".into()))?;
 
     let task = repo::create(&state.pool, project_id, created_by, &input).await?;
@@ -34,12 +36,7 @@ pub async fn list_tasks(
     Path(project_id): Path<Uuid>,
     Query(query): Query<TaskListQuery>,
 ) -> Result<Json<Vec<models::Task>>, AppError> {
-    let tasks = repo::list_by_project(
-        &state.pool,
-        project_id,
-        query.status.as_deref(),
-    )
-    .await?;
+    let tasks = repo::list_by_project(&state.pool, project_id, query.status.as_deref()).await?;
     Ok(Json(tasks))
 }
 
@@ -79,12 +76,15 @@ pub async fn transition_task(
 ) -> Result<Json<models::Task>, AppError> {
     let task = repo::transition(&state.pool, id, &input).await?;
 
-    let _ = state.events_tx.send(serde_json::json!({
-        "type": "task.status_changed",
-        "taskId": task.id,
-        "projectId": task.project_id,
-        "status": task.status,
-    }).to_string());
+    let _ = state.events_tx.send(
+        serde_json::json!({
+            "type": "task.status_changed",
+            "taskId": task.id,
+            "projectId": task.project_id,
+            "status": task.status,
+        })
+        .to_string(),
+    );
 
     Ok(Json(task))
 }

@@ -54,11 +54,6 @@ pub fn create_router() -> Router<AppState> {
             "/api/sessions/:id",
             get(handlers::sessions::get_session).put(handlers::sessions::update_session),
         )
-        // Messages
-        .route(
-            "/api/sessions/:sessionId/messages",
-            post(handlers::messages::create_message).get(handlers::messages::list_messages),
-        )
         // Events
         .route(
             "/api/sessions/:sessionId/events",
@@ -75,10 +70,6 @@ pub fn create_router() -> Router<AppState> {
         .route(
             "/internal/sessions",
             post(handlers::internal::create_session),
-        )
-        .route(
-            "/internal/messages",
-            post(handlers::internal::create_message),
         )
         .route("/internal/events", post(handlers::internal::create_event))
         .route("/internal/logs", post(handlers::internal::create_log))

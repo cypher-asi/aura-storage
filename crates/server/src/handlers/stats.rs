@@ -48,14 +48,13 @@ pub async fn get_stats(
             let project_id = query.project_id.ok_or_else(|| {
                 AppError::BadRequest("projectId is required for scope=project".into())
             })?;
-            let stats =
-                query_stats(&state.pool, "project_id", project_id, query.agent_id).await?;
+            let stats = query_stats(&state.pool, "project_id", project_id, query.agent_id).await?;
             Ok(Json(stats))
         }
         "org" => {
-            let org_id = query.org_id.ok_or_else(|| {
-                AppError::BadRequest("orgId is required for scope=org".into())
-            })?;
+            let org_id = query
+                .org_id
+                .ok_or_else(|| AppError::BadRequest("orgId is required for scope=org".into()))?;
             let stats = query_stats(&state.pool, "org_id", org_id, query.agent_id).await?;
             Ok(Json(stats))
         }
@@ -87,7 +86,8 @@ async fn query_stats(
     // Build query with agent filter. $1 = scope_id, $2 = agent_id.
     // Safe: scope_column is only ever "project_id" or "org_id" from our match.
     // Tasks use assigned_project_agent_id, sessions/messages use project_agent_id.
-    let taf = "AND assigned_project_agent_id IN (SELECT id FROM project_agents WHERE agent_id = $2)";
+    let taf =
+        "AND assigned_project_agent_id IN (SELECT id FROM project_agents WHERE agent_id = $2)";
     let saf = "AND project_agent_id IN (SELECT id FROM project_agents WHERE agent_id = $2)";
 
     let sql = format!(

@@ -26,11 +26,7 @@ pub struct TokenValidator {
 }
 
 impl TokenValidator {
-    pub fn new(
-        auth0_domain: String,
-        auth0_audience: String,
-        cookie_secret: String,
-    ) -> Self {
+    pub fn new(auth0_domain: String, auth0_audience: String, cookie_secret: String) -> Self {
         Self {
             jwks: JwksClient::new(&auth0_domain),
             cookie_secret,
@@ -40,8 +36,8 @@ impl TokenValidator {
     }
 
     pub async fn validate(&self, token: &str) -> Result<TokenClaims, String> {
-        let header = jsonwebtoken::decode_header(token)
-            .map_err(|e| format!("Invalid token header: {e}"))?;
+        let header =
+            jsonwebtoken::decode_header(token).map_err(|e| format!("Invalid token header: {e}"))?;
 
         let kid = header.kid.as_deref().unwrap_or("");
 

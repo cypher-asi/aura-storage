@@ -35,12 +35,11 @@ pub async fn create(
 }
 
 pub async fn list_by_project(pool: &PgPool, project_id: Uuid) -> Result<Vec<Spec>, AppError> {
-    let specs = sqlx::query_as::<_, Spec>(
-        "SELECT * FROM specs WHERE project_id = $1 ORDER BY order_index",
-    )
-    .bind(project_id)
-    .fetch_all(pool)
-    .await?;
+    let specs =
+        sqlx::query_as::<_, Spec>("SELECT * FROM specs WHERE project_id = $1 ORDER BY order_index")
+            .bind(project_id)
+            .fetch_all(pool)
+            .await?;
 
     Ok(specs)
 }
@@ -53,11 +52,7 @@ pub async fn get(pool: &PgPool, id: Uuid) -> Result<Spec, AppError> {
         .ok_or_else(|| AppError::NotFound("Spec not found".into()))
 }
 
-pub async fn update(
-    pool: &PgPool,
-    id: Uuid,
-    input: &UpdateSpecRequest,
-) -> Result<Spec, AppError> {
+pub async fn update(pool: &PgPool, id: Uuid, input: &UpdateSpecRequest) -> Result<Spec, AppError> {
     sqlx::query_as::<_, Spec>(
         r#"
         UPDATE specs SET

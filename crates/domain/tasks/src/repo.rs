@@ -15,10 +15,8 @@ pub async fn create(
         return Err(AppError::BadRequest("Task title must not be empty".into()));
     }
 
-    let dep_ids = serde_json::to_value(
-        input.dependency_task_ids.as_deref().unwrap_or(&[]),
-    )
-    .unwrap_or_default();
+    let dep_ids = serde_json::to_value(input.dependency_task_ids.as_deref().unwrap_or(&[]))
+        .unwrap_or_default();
 
     let task = sqlx::query_as::<_, Task>(
         r#"
@@ -49,25 +47,24 @@ pub async fn list_by_project(
     project_id: Uuid,
     status_filter: Option<&str>,
 ) -> Result<Vec<Task>, AppError> {
-    let tasks = match status_filter {
-        Some(status) => {
-            sqlx::query_as::<_, Task>(
+    let tasks =
+        match status_filter {
+            Some(status) => sqlx::query_as::<_, Task>(
                 "SELECT * FROM tasks WHERE project_id = $1 AND status = $2 ORDER BY order_index",
             )
             .bind(project_id)
             .bind(status)
             .fetch_all(pool)
-            .await?
-        }
-        None => {
-            sqlx::query_as::<_, Task>(
-                "SELECT * FROM tasks WHERE project_id = $1 ORDER BY order_index",
-            )
-            .bind(project_id)
-            .fetch_all(pool)
-            .await?
-        }
-    };
+            .await?,
+            None => {
+                sqlx::query_as::<_, Task>(
+                    "SELECT * FROM tasks WHERE project_id = $1 ORDER BY order_index",
+                )
+                .bind(project_id)
+                .fetch_all(pool)
+                .await?
+            }
+        };
 
     Ok(tasks)
 }
@@ -80,11 +77,7 @@ pub async fn get(pool: &PgPool, id: Uuid) -> Result<Task, AppError> {
         .ok_or_else(|| AppError::NotFound("Task not found".into()))
 }
 
-pub async fn update(
-    pool: &PgPool,
-    id: Uuid,
-    input: &UpdateTaskRequest,
-) -> Result<Task, AppError> {
+pub async fn update(pool: &PgPool, id: Uuid, input: &UpdateTaskRequest) -> Result<Task, AppError> {
     sqlx::query_as::<_, Task>(
         r#"
         UPDATE tasks SET
