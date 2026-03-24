@@ -10,6 +10,18 @@ use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct UsageCostResponse {
+    #[allow(dead_code)]
+    total_input_tokens: i64,
+    #[allow(dead_code)]
+    total_output_tokens: i64,
+    #[allow(dead_code)]
+    total_tokens: i64,
+    total_cost_usd: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StatsQuery {
     pub scope: String,
     pub project_id: Option<Uuid>,
@@ -28,6 +40,8 @@ pub struct ExecutionStats {
     pub done_tasks: i64,
     pub failed_tasks: i64,
     pub completion_percentage: f64,
+    pub total_input_tokens: i64,
+    pub total_output_tokens: i64,
     pub total_tokens: i64,
     pub total_events: i64,
     pub total_agents: i64,
@@ -36,6 +50,8 @@ pub struct ExecutionStats {
     pub lines_changed: i64,
     pub total_specs: i64,
     pub contributors: i64,
+    #[sqlx(skip)]
+    pub estimated_cost_usd: f64,
 }
 
 pub async fn get_stats(
@@ -43,30 +59,65 @@ pub async fn get_stats(
     State(state): State<AppState>,
     Query(query): Query<StatsQuery>,
 ) -> Result<Json<ExecutionStats>, AppError> {
-    match query.scope.as_str() {
+    get_stats_inner(
+        &state.pool,
+        &state.http_client,
+        state.aura_network_url.as_deref(),
+        state.aura_network_token.as_deref(),
+        query,
+    )
+    .await
+}
+
+pub async fn get_stats_inner(
+    pool: &sqlx::PgPool,
+    http_client: &reqwest::Client,
+    network_url: Option<&str>,
+    network_token: Option<&str>,
+    query: StatsQuery,
+) -> Result<Json<ExecutionStats>, AppError> {
+    let (mut stats, cost_path) = match query.scope.as_str() {
         "project" => {
             let project_id = query.project_id.ok_or_else(|| {
                 AppError::BadRequest("projectId is required for scope=project".into())
             })?;
-            let stats = query_stats(&state.pool, "project_id", project_id, query.agent_id).await?;
-            Ok(Json(stats))
+            let stats = query_stats(pool, "project_id", project_id, query.agent_id).await?;
+            (stats, format!("/internal/projects/{project_id}/usage"))
         }
         "org" => {
             let org_id = query
                 .org_id
                 .ok_or_else(|| AppError::BadRequest("orgId is required for scope=org".into()))?;
-            let stats = query_stats(&state.pool, "org_id", org_id, query.agent_id).await?;
-            Ok(Json(stats))
+            let stats = query_stats(pool, "org_id", org_id, query.agent_id).await?;
+            (stats, format!("/internal/orgs/{org_id}/usage"))
         }
         "network" => {
-            let stats = query_network_stats(&state.pool, query.agent_id).await?;
-            Ok(Json(stats))
+            let stats = query_network_stats(pool, query.agent_id).await?;
+            (stats, "/internal/usage/network".to_string())
         }
-        _ => Err(AppError::BadRequest(format!(
-            "Invalid scope: '{}'. Must be: project, org, or network",
-            query.scope
-        ))),
+        _ => {
+            return Err(AppError::BadRequest(format!(
+                "Invalid scope: '{}'. Must be: project, org, or network",
+                query.scope
+            )));
+        }
+    };
+
+    // Fetch cost from aura-network if configured
+    if let (Some(url), Some(token)) = (network_url, network_token) {
+        if let Ok(resp) = http_client
+            .get(format!("{url}{cost_path}"))
+            .header("x-internal-token", token)
+            .send()
+            .await
+        {
+            if let Ok(usage) = resp.json::<UsageCostResponse>().await {
+                stats.estimated_cost_usd = usage.total_cost_usd;
+            }
+        }
     }
+
+    Ok(Json(stats))
 }
 
 /// Query stats scoped by a column (project_id or org_id), with optional agent filter.
@@ -107,6 +158,8 @@ async fn query_stats(
                     (SELECT COUNT(*) FROM tasks WHERE {col} = $1 {taf})::numeric * 100, 1
                 ))::float8
             END as completion_percentage,
+            COALESCE((SELECT SUM(total_input_tokens)::int8 FROM sessions WHERE {col} = $1 {saf}), 0) as total_input_tokens,
+            COALESCE((SELECT SUM(total_output_tokens)::int8 FROM sessions WHERE {col} = $1 {saf}), 0) as total_output_tokens,
             COALESCE((SELECT SUM(total_input_tokens + total_output_tokens)::int8 FROM sessions WHERE {col} = $1 {saf}), 0) as total_tokens,
             COALESCE((SELECT COUNT(*) FROM session_events WHERE {col} = $1 {saf}), 0) as total_events,
             COALESCE((SELECT COUNT(*) FROM project_agents WHERE {col} = $1), 0) as total_agents,
@@ -160,6 +213,8 @@ async fn query_stats_unfiltered(
                     (SELECT COUNT(*) FROM tasks WHERE {col} = $1)::numeric * 100, 1
                 ))::float8
             END as completion_percentage,
+            COALESCE((SELECT SUM(total_input_tokens)::int8 FROM sessions WHERE {col} = $1), 0) as total_input_tokens,
+            COALESCE((SELECT SUM(total_output_tokens)::int8 FROM sessions WHERE {col} = $1), 0) as total_output_tokens,
             COALESCE((SELECT SUM(total_input_tokens + total_output_tokens)::int8 FROM sessions WHERE {col} = $1), 0) as total_tokens,
             COALESCE((SELECT COUNT(*) FROM session_events WHERE {col} = $1), 0) as total_events,
             COALESCE((SELECT COUNT(*) FROM project_agents WHERE {col} = $1), 0) as total_agents,
@@ -209,6 +264,8 @@ async fn query_network_stats(
                     (SELECT COUNT(*) FROM tasks)::numeric * 100, 1
                 ))::float8
             END as completion_percentage,
+            COALESCE((SELECT SUM(total_input_tokens)::int8 FROM sessions), 0) as total_input_tokens,
+            COALESCE((SELECT SUM(total_output_tokens)::int8 FROM sessions), 0) as total_output_tokens,
             COALESCE((SELECT SUM(total_input_tokens + total_output_tokens)::int8 FROM sessions), 0) as total_tokens,
             COALESCE((SELECT COUNT(*) FROM session_events), 0) as total_events,
             COALESCE((SELECT COUNT(*) FROM project_agents), 0) as total_agents,

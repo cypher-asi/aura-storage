@@ -770,13 +770,16 @@ Get aggregate statistics scoped to a project, organization, or the entire networ
   "failedTasks": 3,
   "completionPercentage": 52.38,
   "totalTokens": 1250000,
+  "totalInputTokens": 8500,
+  "totalOutputTokens": 2300,
   "totalEvents": 980,
   "totalAgents": 4,
   "totalSessions": 12,
   "totalTimeSeconds": 3600.5,
   "linesChanged": 1450,
   "totalSpecs": 6,
-  "contributors": 3
+  "contributors": 3,
+  "estimatedCostUsd": 0.085
 }
 ```
 
@@ -791,6 +794,8 @@ Get aggregate statistics scoped to a project, organization, or the entire networ
 | `failedTasks`          | integer | Tasks in `failed` status                          |
 | `completionPercentage` | float   | Percentage of tasks completed                     |
 | `totalTokens`          | integer | Total LLM tokens consumed                         |
+| `totalInputTokens`    | integer | Total input tokens across all sessions             |
+| `totalOutputTokens`   | integer | Total output tokens across all sessions            |
 | `totalEvents`          | integer | Total session events recorded                     |
 | `totalAgents`          | integer | Number of distinct agents                         |
 | `totalSessions`        | integer | Number of sessions                                |
@@ -798,6 +803,7 @@ Get aggregate statistics scoped to a project, organization, or the entire networ
 | `linesChanged`         | integer | Total lines added and removed                     |
 | `totalSpecs`           | integer | Number of specs                                   |
 | `contributors`         | integer | Number of distinct contributors                   |
+| `estimatedCostUsd`    | float   | Estimated cost in USD, sourced from aura-network   |
 
 ---
 
@@ -881,11 +887,13 @@ List log entries for a project.
 
 ## Internal Endpoints
 
-These endpoints are used for service-to-service communication and require the `X-Internal-Token` header instead of a JWT.
+These endpoints are used for service-to-service communication and require the `X-Internal-Token` header instead of a JWT. Create endpoints include `projectId` and `createdBy` in the request body (since there is no JWT to derive from).
 
 ---
 
-### POST /internal/sessions
+### Sessions
+
+#### POST /internal/sessions
 
 **Auth:** Internal
 
@@ -915,7 +923,57 @@ Create a session on behalf of a user (used by aura-router).
 
 ---
 
-### POST /internal/events
+#### GET /internal/sessions/:id
+
+**Auth:** Internal
+
+Get a single session by ID.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description       |
+|-----------|------|----------|-------------------|
+| `id`      | UUID | Yes      | The session's UUID |
+
+**Response:** `200` — Session
+
+---
+
+#### PUT /internal/sessions/:id
+
+**Auth:** Internal
+
+Update a session. Same request body as [PUT /api/sessions/:id](#put-apisessionsid).
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description       |
+|-----------|------|----------|-------------------|
+| `id`      | UUID | Yes      | The session's UUID |
+
+**Response:** `200` — Session
+
+---
+
+#### GET /internal/project-agents/:projectAgentId/sessions
+
+**Auth:** Internal
+
+List all sessions for a project agent.
+
+**Path Parameters:**
+
+| Parameter        | Type | Required | Description              |
+|------------------|------|----------|--------------------------|
+| `projectAgentId` | UUID | Yes      | The project agent's UUID |
+
+**Response:** `200` — Array of Session objects.
+
+---
+
+### Events
+
+#### POST /internal/events
 
 **Auth:** Internal
 
@@ -927,7 +985,32 @@ Create a session event from an internal service.
 
 ---
 
-### POST /internal/logs
+#### GET /internal/sessions/:sessionId/events
+
+**Auth:** Internal
+
+List events for a session, ordered by timestamp ascending.
+
+**Path Parameters:**
+
+| Parameter   | Type | Required | Description       |
+|-------------|------|----------|-------------------|
+| `sessionId` | UUID | Yes      | The session's UUID |
+
+**Query Parameters:**
+
+| Parameter | Type    | Required | Default | Description                |
+|-----------|---------|----------|---------|----------------------------|
+| `limit`   | integer | No       | 100     | Max results (capped at 500) |
+| `offset`  | integer | No       | 0       | Number of events to skip    |
+
+**Response:** `200` — Array of SessionEvent objects (ordered by `timestamp` ASC).
+
+---
+
+### Logs
+
+#### POST /internal/logs
 
 **Auth:** Internal
 
@@ -961,7 +1044,101 @@ Create a log entry from an internal service.
 
 ---
 
-### POST /internal/project-agents/:id/status
+#### GET /internal/projects/:projectId/logs
+
+**Auth:** Internal
+
+List log entries for a project.
+
+**Path Parameters:**
+
+| Parameter   | Type | Required | Description        |
+|-------------|------|----------|--------------------|
+| `projectId` | UUID | Yes      | The project's UUID |
+
+**Query Parameters:**
+
+| Parameter | Type    | Required | Default | Description                              |
+|-----------|---------|----------|---------|------------------------------------------|
+| `level`   | string  | No       | —       | Filter by level: `info`, `warn`, `error`, `debug` |
+| `limit`   | integer | No       | 100     | Max results to return                     |
+| `offset`  | integer | No       | 0       | Number of entries to skip                 |
+
+**Response:** `200` — Array of LogEntry objects.
+
+---
+
+### Project Agents
+
+#### POST /internal/projects/:projectId/agents
+
+**Auth:** Internal
+
+Create a project agent from an internal service.
+
+**Path Parameters:**
+
+| Parameter   | Type | Required | Description        |
+|-------------|------|----------|--------------------|
+| `projectId` | UUID | Yes      | The project's UUID |
+
+**Request Body:**
+
+| Field       | Type   | Required | Description                |
+|-------------|--------|----------|----------------------------|
+| `projectId` | UUID   | Yes      | The project's UUID          |
+| `createdBy` | UUID   | Yes      | The originating user        |
+| `agentId`   | UUID   | Yes      | The agent to attach         |
+| `orgId`     | UUID   | No       | Organization scope          |
+| `model`     | string | No       | LLM model identifier        |
+
+```json
+{
+  "projectId": "uuid",
+  "createdBy": "uuid",
+  "agentId": "uuid",
+  "orgId": "uuid",
+  "model": "string"
+}
+```
+
+**Response:** `200` — ProjectAgent
+
+---
+
+#### GET /internal/projects/:projectId/agents
+
+**Auth:** Internal
+
+List all agents for a project.
+
+**Path Parameters:**
+
+| Parameter   | Type | Required | Description        |
+|-------------|------|----------|--------------------|
+| `projectId` | UUID | Yes      | The project's UUID |
+
+**Response:** `200` — Array of ProjectAgent objects.
+
+---
+
+#### GET /internal/project-agents/:id
+
+**Auth:** Internal
+
+Get a single project agent by ID.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description              |
+|-----------|------|----------|--------------------------|
+| `id`      | UUID | Yes      | The project agent's UUID |
+
+**Response:** `200` — ProjectAgent
+
+---
+
+#### POST /internal/project-agents/:id/status
 
 **Auth:** Internal
 
@@ -989,7 +1166,23 @@ Update a project agent's status from an internal service.
 
 ---
 
-### GET /internal/projects/:projectId/agents/count
+#### DELETE /internal/project-agents/:id
+
+**Auth:** Internal
+
+Delete a project agent.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description              |
+|-----------|------|----------|--------------------------|
+| `id`      | UUID | Yes      | The project agent's UUID |
+
+**Response:** `204 No Content`
+
+---
+
+#### GET /internal/projects/:projectId/agents/count
 
 **Auth:** Internal
 
@@ -1008,6 +1201,256 @@ Get the number of agents attached to a project.
   "count": 3
 }
 ```
+
+---
+
+### Specs
+
+#### POST /internal/specs
+
+**Auth:** Internal
+
+Create a spec from an internal service.
+
+**Request Body:**
+
+| Field              | Type    | Required | Description                |
+|--------------------|---------|----------|----------------------------|
+| `projectId`        | UUID    | Yes      | The project's UUID          |
+| `createdBy`        | UUID    | Yes      | The originating user        |
+| `title`            | string  | Yes      | Spec title                  |
+| `orderIndex`       | integer | Yes      | Display/sort order          |
+| `markdownContents` | string  | Yes      | Full markdown body          |
+| `orgId`            | UUID    | No       | Organization scope          |
+
+```json
+{
+  "projectId": "uuid",
+  "createdBy": "uuid",
+  "title": "string",
+  "orderIndex": 0,
+  "markdownContents": "string",
+  "orgId": "uuid"
+}
+```
+
+**Response:** `200` — Spec
+
+---
+
+#### GET /internal/projects/:projectId/specs
+
+**Auth:** Internal
+
+List all specs for a project, ordered by `orderIndex`.
+
+**Path Parameters:**
+
+| Parameter   | Type | Required | Description        |
+|-------------|------|----------|--------------------|
+| `projectId` | UUID | Yes      | The project's UUID |
+
+**Response:** `200` — Array of Spec objects (ordered by `orderIndex`).
+
+---
+
+#### GET /internal/specs/:id
+
+**Auth:** Internal
+
+Get a single spec by ID.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description    |
+|-----------|------|----------|----------------|
+| `id`      | UUID | Yes      | The spec's UUID |
+
+**Response:** `200` — Spec
+
+---
+
+#### PUT /internal/specs/:id
+
+**Auth:** Internal
+
+Update a spec. Same request body as [PUT /api/specs/:id](#put-apispecsid).
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description    |
+|-----------|------|----------|----------------|
+| `id`      | UUID | Yes      | The spec's UUID |
+
+**Response:** `200` — Spec
+
+---
+
+#### DELETE /internal/specs/:id
+
+**Auth:** Internal
+
+Delete a spec.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description    |
+|-----------|------|----------|----------------|
+| `id`      | UUID | Yes      | The spec's UUID |
+
+**Response:** `204 No Content`
+
+---
+
+### Tasks
+
+#### POST /internal/tasks
+
+**Auth:** Internal
+
+Create a task from an internal service.
+
+**Request Body:**
+
+| Field                    | Type     | Required | Description                          |
+|--------------------------|----------|----------|--------------------------------------|
+| `projectId`              | UUID     | Yes      | The project's UUID                    |
+| `createdBy`              | UUID     | Yes      | The originating user                  |
+| `specId`                 | UUID     | Yes      | Parent spec                           |
+| `title`                  | string   | Yes      | Task title                            |
+| `orderIndex`             | integer  | Yes      | Display/sort order                    |
+| `description`            | string   | No       | Task description                      |
+| `dependencyTaskIds`      | UUID[]   | No       | Tasks that must complete first        |
+| `parentTaskId`           | UUID     | No       | Parent task for sub-task hierarchy     |
+| `assignedProjectAgentId` | UUID     | No       | Agent assigned to this task           |
+| `orgId`                  | UUID     | No       | Organization scope                    |
+
+```json
+{
+  "projectId": "uuid",
+  "createdBy": "uuid",
+  "specId": "uuid",
+  "title": "string",
+  "orderIndex": 0,
+  "description": "string",
+  "dependencyTaskIds": ["uuid"],
+  "parentTaskId": "uuid",
+  "assignedProjectAgentId": "uuid",
+  "orgId": "uuid"
+}
+```
+
+**Response:** `200` — Task
+
+---
+
+#### GET /internal/projects/:projectId/tasks
+
+**Auth:** Internal
+
+List all tasks for a project, ordered by `orderIndex`.
+
+**Path Parameters:**
+
+| Parameter   | Type | Required | Description        |
+|-------------|------|----------|--------------------|
+| `projectId` | UUID | Yes      | The project's UUID |
+
+**Query Parameters:**
+
+| Parameter | Type   | Required | Description                                                  |
+|-----------|--------|----------|--------------------------------------------------------------|
+| `status`  | string | No       | Filter by status: `pending`, `ready`, `in_progress`, `blocked`, `done`, `failed` |
+
+**Response:** `200` — Array of Task objects (ordered by `orderIndex`).
+
+---
+
+#### GET /internal/tasks/:id
+
+**Auth:** Internal
+
+Get a single task by ID.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description    |
+|-----------|------|----------|----------------|
+| `id`      | UUID | Yes      | The task's UUID |
+
+**Response:** `200` — Task
+
+---
+
+#### PUT /internal/tasks/:id
+
+**Auth:** Internal
+
+Update task fields. Same request body as [PUT /api/tasks/:id](#put-apitasksid).
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description    |
+|-----------|------|----------|----------------|
+| `id`      | UUID | Yes      | The task's UUID |
+
+**Response:** `200` — Task
+
+---
+
+#### DELETE /internal/tasks/:id
+
+**Auth:** Internal
+
+Delete a task.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description    |
+|-----------|------|----------|----------------|
+| `id`      | UUID | Yes      | The task's UUID |
+
+**Response:** `204 No Content`
+
+---
+
+#### POST /internal/tasks/:id/transition
+
+**Auth:** Internal
+
+Transition a task to a new status. Enforces the same state machine as the public endpoint.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description    |
+|-----------|------|----------|----------------|
+| `id`      | UUID | Yes      | The task's UUID |
+
+**Request Body:**
+
+| Field    | Type   | Required | Description    |
+|----------|--------|----------|----------------|
+| `status` | string | Yes      | Target status  |
+
+```json
+{
+  "status": "in_progress"
+}
+```
+
+**Response:** `200` — Task
+
+---
+
+### Stats
+
+#### GET /internal/stats
+
+**Auth:** Internal
+
+Get aggregate statistics. Same query parameters as [GET /api/stats](#get-apistats).
+
+**Response:** `200` — Same response format as [GET /api/stats](#get-apistats).
 
 ---
 

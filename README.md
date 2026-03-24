@@ -51,6 +51,8 @@ Returns:
 | `AUTH_COOKIE_SECRET` | Yes | Shared secret for HS256 token validation (same as aura-network) |
 | `INTERNAL_SERVICE_TOKEN` | Yes | Token for service-to-service auth (aura-swarm -> aura-storage) |
 | `PORT` | No | Server port (default: 3000) |
+| `AURA_NETWORK_URL` | No | aura-network base URL for cost data in stats |
+| `AURA_NETWORK_TOKEN` | No | Internal service token for aura-network |
 | `CORS_ORIGINS` | No | Comma-separated allowed origins. Omit for permissive (dev mode) |
 | `RUST_LOG` | No | Tracing filter (default: `aura_storage=debug,tower_http=debug,info`) |
 
@@ -256,6 +258,8 @@ Returns:
   "doneTasks": 12,
   "failedTasks": 2,
   "completionPercentage": 48.0,
+  "totalInputTokens": 8500,
+  "totalOutputTokens": 2300,
   "totalTokens": 150000,
   "totalEvents": 340,
   "totalAgents": 3,
@@ -263,11 +267,12 @@ Returns:
   "totalTimeSeconds": 3600,
   "linesChanged": 450,
   "totalSpecs": 4,
-  "contributors": 2
+  "contributors": 2,
+  "estimatedCostUsd": 0.085
 }
 ```
 
-Same response shape at all scope levels. Token cost, commits, and PRs come from aura-network and orbit respectively.
+Same response shape at all scope levels. Cost is fetched from aura-network when `AURA_NETWORK_URL` is configured.
 
 ### Internal Endpoints
 
@@ -275,10 +280,32 @@ Authenticated via `X-Internal-Token` header. Called by aura-swarm and other back
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/internal/sessions` | Create session (with createdBy in body) |
-| POST | `/internal/events` | Write session event |
-| POST | `/internal/logs` | Write log entry |
+| POST | `/internal/sessions` | Create session |
+| GET | `/internal/sessions/:id` | Get session |
+| PUT | `/internal/sessions/:id` | Update session |
+| GET | `/internal/project-agents/:projectAgentId/sessions` | List sessions |
+| POST | `/internal/events` | Create event |
+| GET | `/internal/sessions/:sessionId/events` | List events |
+| POST | `/internal/logs` | Create log entry |
+| GET | `/internal/projects/:projectId/logs` | List log entries |
+| POST | `/internal/projects/:projectId/agents` | Create project agent |
+| GET | `/internal/projects/:projectId/agents` | List project agents |
+| GET | `/internal/project-agents/:id` | Get project agent |
 | POST | `/internal/project-agents/:id/status` | Update agent status |
+| DELETE | `/internal/project-agents/:id` | Delete project agent |
+| GET | `/internal/projects/:projectId/agents/count` | Get agent count |
+| POST | `/internal/specs` | Create spec |
+| GET | `/internal/projects/:projectId/specs` | List specs |
+| GET | `/internal/specs/:id` | Get spec |
+| PUT | `/internal/specs/:id` | Update spec |
+| DELETE | `/internal/specs/:id` | Delete spec |
+| POST | `/internal/tasks` | Create task |
+| GET | `/internal/projects/:projectId/tasks` | List tasks |
+| GET | `/internal/tasks/:id` | Get task |
+| PUT | `/internal/tasks/:id` | Update task |
+| DELETE | `/internal/tasks/:id` | Delete task |
+| POST | `/internal/tasks/:id/transition` | Transition task status |
+| GET | `/internal/stats` | Get stats |
 
 Internal endpoints include fields that the public endpoints derive from path params and auth:
 

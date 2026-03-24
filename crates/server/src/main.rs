@@ -46,6 +46,9 @@ async fn main() {
         validator: TokenValidator::new(auth0_domain, auth0_audience, cookie_secret),
         internal_token: InternalToken(internal_token),
         events_tx,
+        http_client: reqwest::Client::new(),
+        aura_network_url: std::env::var("AURA_NETWORK_URL").ok(),
+        aura_network_token: std::env::var("AURA_NETWORK_TOKEN").ok(),
     };
 
     let cors = match std::env::var("CORS_ORIGINS") {
