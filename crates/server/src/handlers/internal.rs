@@ -11,6 +11,7 @@ use aura_storage_project_agents::{models as pa_models, repo as pa_repo};
 use aura_storage_sessions::{models as session_models, repo as session_repo};
 use aura_storage_specs::{models as spec_models, repo as spec_repo};
 use aura_storage_tasks::{models as task_models, repo as task_repo};
+use aura_storage_artifacts::{models as artifact_models, repo as artifact_repo};
 
 use crate::state::AppState;
 
@@ -428,4 +429,63 @@ pub async fn get_stats(
         query,
     )
     .await
+}
+
+// ============================================================================
+// Artifacts
+// ============================================================================
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InternalCreateArtifactRequest {
+    pub project_id: Uuid,
+    pub created_by: Uuid,
+    #[serde(flatten)]
+    pub artifact: artifact_models::CreateArtifactRequest,
+}
+
+pub async fn create_artifact(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Json(input): Json<InternalCreateArtifactRequest>,
+) -> Result<Json<artifact_models::Artifact>, AppError> {
+    let artifact =
+        artifact_repo::create(&state.pool, input.project_id, input.created_by, &input.artifact)
+            .await?;
+    Ok(Json(artifact))
+}
+
+pub async fn get_artifact(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<artifact_models::Artifact>, AppError> {
+    let artifact = artifact_repo::get(&state.pool, id).await?;
+    Ok(Json(artifact))
+}
+
+pub async fn list_artifacts(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Path(project_id): Path<Uuid>,
+    Query(query): Query<artifact_models::ArtifactListQuery>,
+) -> Result<Json<Vec<artifact_models::Artifact>>, AppError> {
+    let artifacts = artifact_repo::list_by_project(
+        &state.pool,
+        project_id,
+        query.artifact_type.as_deref(),
+        query.limit(),
+        query.offset(),
+    )
+    .await?;
+    Ok(Json(artifacts))
+}
+
+pub async fn delete_artifact(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, AppError> {
+    artifact_repo::delete(&state.pool, id).await?;
+    Ok(StatusCode::NO_CONTENT)
 }

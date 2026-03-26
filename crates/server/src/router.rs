@@ -59,6 +59,19 @@ pub fn create_router() -> Router<AppState> {
             "/api/sessions/:sessionId/events",
             post(handlers::events::create_event).get(handlers::events::list_events),
         )
+        // Artifacts
+        .route(
+            "/api/projects/:projectId/artifacts",
+            post(handlers::artifacts::create_artifact).get(handlers::artifacts::list_artifacts),
+        )
+        .route(
+            "/api/artifacts/:id",
+            get(handlers::artifacts::get_artifact).delete(handlers::artifacts::delete_artifact),
+        )
+        .route(
+            "/api/artifacts/:id/children",
+            get(handlers::artifacts::get_artifact_children),
+        )
         // Stats
         .route("/api/stats", get(handlers::stats::get_stats))
         // Log Entries
@@ -144,6 +157,19 @@ pub fn create_router() -> Router<AppState> {
         .route(
             "/internal/tasks/:id/transition",
             post(handlers::internal::transition_task),
+        )
+        // Artifacts
+        .route(
+            "/internal/artifacts",
+            post(handlers::internal::create_artifact),
+        )
+        .route(
+            "/internal/projects/:projectId/artifacts",
+            get(handlers::internal::list_artifacts),
+        )
+        .route(
+            "/internal/artifacts/:id",
+            get(handlers::internal::get_artifact).delete(handlers::internal::delete_artifact),
         )
         // Stats
         .route("/internal/stats", get(handlers::internal::get_stats))

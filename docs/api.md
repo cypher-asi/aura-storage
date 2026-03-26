@@ -2,7 +2,7 @@
 
 ## Overview
 
-Aura Storage provides persistent storage for project agents, specs, tasks, sessions, events, logs, and real-time WebSocket notifications. All request and response bodies use **camelCase** JSON.
+Aura Storage provides persistent storage for project agents, specs, tasks, sessions, events, logs, artifacts, and real-time WebSocket notifications. All request and response bodies use **camelCase** JSON.
 
 ---
 
@@ -740,6 +740,108 @@ List events for a session, ordered by timestamp ascending.
 
 ---
 
+## Artifacts
+
+Generated images and 3D models with iteration tracking.
+
+### POST /api/projects/:projectId/artifacts
+
+Create an artifact.
+
+**Auth:** JWT
+
+**Path params:** `projectId` (UUID)
+
+**Request body:**
+
+```json
+{
+  "type": "image | model (required)",
+  "name": "string (optional)",
+  "description": "string (optional)",
+  "assetUrl": "string (required — S3 URL or GLB URL)",
+  "thumbnailUrl": "string (optional)",
+  "originalUrl": "string (optional — unwatermarked version)",
+  "parentId": "uuid (optional — parent artifact for iterations)",
+  "isIteration": "boolean (default: false)",
+  "prompt": "string (optional)",
+  "promptMode": "new | remix | edit (optional)",
+  "model": "string (optional — e.g., gpt-image-1, tripo-v2)",
+  "provider": "string (optional — e.g., openai, google, tripo)",
+  "orgId": "uuid (optional)",
+  "meta": "{} (optional — freeform JSONB)"
+}
+```
+
+**Response:** 200
+
+```json
+{
+  "id": "uuid",
+  "projectId": "uuid",
+  "orgId": "uuid | null",
+  "createdBy": "uuid",
+  "type": "image | model",
+  "name": "string | null",
+  "description": "string | null",
+  "assetUrl": "string",
+  "thumbnailUrl": "string | null",
+  "originalUrl": "string | null",
+  "parentId": "uuid | null",
+  "isIteration": "boolean",
+  "prompt": "string | null",
+  "promptMode": "string | null",
+  "model": "string | null",
+  "provider": "string | null",
+  "meta": "{} | null",
+  "createdAt": "datetime"
+}
+```
+
+---
+
+### GET /api/projects/:projectId/artifacts
+
+List artifacts for a project.
+
+**Auth:** JWT
+
+**Query params:** `type` (optional — filter by "image" or "model"), `limit` (default 50, max 100), `offset` (default 0)
+
+**Response:** 200 — Array of Artifact objects (ordered by createdAt DESC)
+
+---
+
+### GET /api/artifacts/:id
+
+Get a single artifact.
+
+**Auth:** JWT
+
+**Response:** 200 — Artifact object
+
+---
+
+### GET /api/artifacts/:id/children
+
+Get iteration children of an artifact.
+
+**Auth:** JWT
+
+**Response:** 200 — Array of Artifact objects (ordered by createdAt ASC)
+
+---
+
+### DELETE /api/artifacts/:id
+
+Delete an artifact.
+
+**Auth:** JWT
+
+**Response:** 204 No Content
+
+---
+
 ## Stats
 
 ### GET /api/stats
@@ -1439,6 +1541,38 @@ Transition a task to a new status. Enforces the same state machine as the public
 ```
 
 **Response:** `200` — Task
+
+---
+
+### Artifacts
+
+#### POST /internal/artifacts
+
+Create an artifact. Body includes `projectId` and `createdBy`.
+
+**Auth:** Internal
+
+**Request body:** Same fields as public endpoint, plus `projectId` (UUID) and `createdBy` (UUID).
+
+#### GET /internal/projects/:projectId/artifacts
+
+List artifacts for a project.
+
+**Auth:** Internal
+
+**Query params:** `type`, `limit`, `offset`
+
+#### GET /internal/artifacts/:id
+
+Get an artifact.
+
+**Auth:** Internal
+
+#### DELETE /internal/artifacts/:id
+
+Delete an artifact.
+
+**Auth:** Internal
 
 ---
 

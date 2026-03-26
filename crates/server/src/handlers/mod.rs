@@ -1,3 +1,4 @@
+pub mod artifacts;
 pub mod events;
 pub mod internal;
 pub mod logs;
