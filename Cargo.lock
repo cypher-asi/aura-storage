@@ -59,6 +59,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
+name = "aura-storage-artifacts"
+version = "0.1.0"
+dependencies = [
+ "aura-storage-core",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "uuid",
+]
+
+[[package]]
 name = "aura-storage-auth"
 version = "0.1.0"
 dependencies = [
@@ -140,6 +152,7 @@ dependencies = [
 name = "aura-storage-server"
 version = "0.1.0"
 dependencies = [
+ "aura-storage-artifacts",
  "aura-storage-auth",
  "aura-storage-core",
  "aura-storage-db",
