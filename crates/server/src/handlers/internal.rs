@@ -287,6 +287,90 @@ pub async fn get_project_agent_count(
     Ok(Json(serde_json::json!({ "count": count })))
 }
 
+/// Delete all data associated with a project (cascade cleanup).
+/// Called by aura-network after it deletes the project record.
+pub async fn delete_project_data(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Path(project_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let mut tx = state.pool.begin().await.map_err(|e| {
+        AppError::Internal(format!("failed to begin transaction: {e}"))
+    })?;
+
+    let events = sqlx::query("DELETE FROM session_events WHERE project_id = $1")
+        .bind(project_id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+
+    let messages = sqlx::query("DELETE FROM messages WHERE project_id = $1")
+        .bind(project_id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+
+    let logs = sqlx::query("DELETE FROM log_entries WHERE project_id = $1")
+        .bind(project_id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+
+    let artifacts = sqlx::query("DELETE FROM artifacts WHERE project_id = $1")
+        .bind(project_id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+
+    let tasks = sqlx::query("DELETE FROM tasks WHERE project_id = $1")
+        .bind(project_id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+
+    let sessions = sqlx::query("DELETE FROM sessions WHERE project_id = $1")
+        .bind(project_id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+
+    let specs = sqlx::query("DELETE FROM specs WHERE project_id = $1")
+        .bind(project_id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+
+    let agents = sqlx::query("DELETE FROM project_agents WHERE project_id = $1")
+        .bind(project_id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+
+    tx.commit().await.map_err(|e| {
+        AppError::Internal(format!("failed to commit transaction: {e}"))
+    })?;
+
+    tracing::info!(
+        project_id = %project_id,
+        events, messages, logs, artifacts, tasks, sessions, specs, agents,
+        "project data cascade delete complete"
+    );
+
+    Ok(Json(serde_json::json!({
+        "project_id": project_id,
+        "deleted": {
+            "session_events": events,
+            "messages": messages,
+            "log_entries": logs,
+            "artifacts": artifacts,
+            "tasks": tasks,
+            "sessions": sessions,
+            "specs": specs,
+            "project_agents": agents,
+        }
+    })))
+}
+
 // ============================================================================
 // Specs
 // ============================================================================

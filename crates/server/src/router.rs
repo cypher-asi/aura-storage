@@ -1,4 +1,4 @@
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post};
 use axum::Router;
 
 use crate::handlers;
@@ -104,6 +104,11 @@ pub fn create_router() -> Router<AppState> {
         .route(
             "/internal/projects/:projectId/logs",
             get(handlers::internal::list_logs),
+        )
+        // Project cascade delete
+        .route(
+            "/internal/projects/:projectId",
+            delete(handlers::internal::delete_project_data),
         )
         // Project Agents
         .route(
