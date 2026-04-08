@@ -194,6 +194,7 @@ pub struct CreateProcessNodeConnectionRequest {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateProcessRunRequest {
+    pub id: Option<Uuid>,
     pub process_id: Uuid,
     pub trigger: Option<String>,
     pub parent_run_id: Option<Uuid>,
@@ -215,6 +216,7 @@ pub struct UpdateProcessRunRequest {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateProcessEventRequest {
+    pub id: Option<Uuid>,
     pub run_id: Uuid,
     pub node_id: Uuid,
     pub process_id: Uuid,
@@ -238,6 +240,7 @@ pub struct UpdateProcessEventRequest {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateProcessArtifactRequest {
+    pub id: Option<Uuid>,
     pub process_id: Uuid,
     pub run_id: Uuid,
     pub node_id: Uuid,

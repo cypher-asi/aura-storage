@@ -360,11 +360,12 @@ pub async fn create_run(
 ) -> Result<ProcessRun, AppError> {
     sqlx::query_as::<_, ProcessRun>(
         r#"
-        INSERT INTO process_runs (process_id, trigger, parent_run_id, input_override)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO process_runs (id, process_id, trigger, parent_run_id, input_override)
+        VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5)
         RETURNING *
         "#,
     )
+    .bind(input.id)
     .bind(input.process_id)
     .bind(input.trigger.as_deref().unwrap_or("manual"))
     .bind(input.parent_run_id)
@@ -437,11 +438,12 @@ pub async fn create_event(
 ) -> Result<ProcessEvent, AppError> {
     sqlx::query_as::<_, ProcessEvent>(
         r#"
-        INSERT INTO process_events (run_id, node_id, process_id, status, input_snapshot, output)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO process_events (id, run_id, node_id, process_id, status, input_snapshot, output)
+        VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5, $6, $7)
         RETURNING *
         "#,
     )
+    .bind(input.id)
     .bind(input.run_id)
     .bind(input.node_id)
     .bind(input.process_id)
@@ -509,12 +511,13 @@ pub async fn create_artifact(
 ) -> Result<ProcessArtifact, AppError> {
     sqlx::query_as::<_, ProcessArtifact>(
         r#"
-        INSERT INTO process_artifacts (process_id, run_id, node_id, artifact_type, name,
+        INSERT INTO process_artifacts (id, process_id, run_id, node_id, artifact_type, name,
                                        file_path, size_bytes, metadata)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *
         "#,
     )
+    .bind(input.id)
     .bind(input.process_id)
     .bind(input.run_id)
     .bind(input.node_id)
