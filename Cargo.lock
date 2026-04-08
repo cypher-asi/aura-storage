@@ -136,6 +136,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-storage-processes"
+version = "0.1.0"
+dependencies = [
+ "aura-storage-core",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "aura-storage-project-agents"
 version = "0.1.0"
 dependencies = [
