@@ -12,6 +12,7 @@ use aura_storage_sessions::{models as session_models, repo as session_repo};
 use aura_storage_specs::{models as spec_models, repo as spec_repo};
 use aura_storage_tasks::{models as task_models, repo as task_repo};
 use aura_storage_artifacts::{models as artifact_models, repo as artifact_repo};
+use aura_storage_processes::{models as process_models, repo as process_repo};
 
 use crate::state::AppState;
 
@@ -572,4 +573,100 @@ pub async fn delete_artifact(
 ) -> Result<StatusCode, AppError> {
     artifact_repo::delete(&state.pool, id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+// ============================================================================
+// Processes (internal — for executor and scheduler)
+// ============================================================================
+
+pub async fn get_process(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<process_models::Process>, AppError> {
+    let process = process_repo::get_process(&state.pool, id).await?;
+    Ok(Json(process))
+}
+
+pub async fn list_process_nodes(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Path(process_id): Path<Uuid>,
+) -> Result<Json<Vec<process_models::ProcessNode>>, AppError> {
+    let nodes = process_repo::list_nodes(&state.pool, process_id).await?;
+    Ok(Json(nodes))
+}
+
+pub async fn list_process_connections(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Path(process_id): Path<Uuid>,
+) -> Result<Json<Vec<process_models::ProcessNodeConnection>>, AppError> {
+    let conns = process_repo::list_connections(&state.pool, process_id).await?;
+    Ok(Json(conns))
+}
+
+pub async fn update_process(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(input): Json<process_models::UpdateProcessRequest>,
+) -> Result<Json<process_models::Process>, AppError> {
+    let process = process_repo::update_process(&state.pool, id, &input).await?;
+    Ok(Json(process))
+}
+
+pub async fn list_scheduled_processes(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<process_models::Process>>, AppError> {
+    let processes = process_repo::list_scheduled_processes(&state.pool).await?;
+    Ok(Json(processes))
+}
+
+pub async fn create_process_run(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Json(input): Json<process_models::CreateProcessRunRequest>,
+) -> Result<Json<process_models::ProcessRun>, AppError> {
+    let run = process_repo::create_run(&state.pool, &input).await?;
+    Ok(Json(run))
+}
+
+pub async fn update_process_run(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(input): Json<process_models::UpdateProcessRunRequest>,
+) -> Result<Json<process_models::ProcessRun>, AppError> {
+    let run = process_repo::update_run(&state.pool, id, &input).await?;
+    Ok(Json(run))
+}
+
+pub async fn create_process_event(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Json(input): Json<process_models::CreateProcessEventRequest>,
+) -> Result<Json<process_models::ProcessEvent>, AppError> {
+    let event = process_repo::create_event(&state.pool, &input).await?;
+    Ok(Json(event))
+}
+
+pub async fn update_process_event(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(input): Json<process_models::UpdateProcessEventRequest>,
+) -> Result<Json<process_models::ProcessEvent>, AppError> {
+    let event = process_repo::update_event(&state.pool, id, &input).await?;
+    Ok(Json(event))
+}
+
+pub async fn create_process_artifact(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Json(input): Json<process_models::CreateProcessArtifactRequest>,
+) -> Result<Json<process_models::ProcessArtifact>, AppError> {
+    let artifact = process_repo::create_artifact(&state.pool, &input).await?;
+    Ok(Json(artifact))
 }

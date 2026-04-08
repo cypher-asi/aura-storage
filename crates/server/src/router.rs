@@ -237,6 +237,44 @@ pub fn create_router() -> Router<AppState> {
             "/internal/artifacts/:id",
             get(handlers::internal::get_artifact).delete(handlers::internal::delete_artifact),
         )
+        // Processes
+        .route(
+            "/internal/processes/scheduled",
+            get(handlers::internal::list_scheduled_processes),
+        )
+        .route(
+            "/internal/processes/:id",
+            get(handlers::internal::get_process)
+                .put(handlers::internal::update_process),
+        )
+        .route(
+            "/internal/processes/:id/nodes",
+            get(handlers::internal::list_process_nodes),
+        )
+        .route(
+            "/internal/processes/:id/connections",
+            get(handlers::internal::list_process_connections),
+        )
+        .route(
+            "/internal/process-runs",
+            post(handlers::internal::create_process_run),
+        )
+        .route(
+            "/internal/process-runs/:id",
+            put(handlers::internal::update_process_run),
+        )
+        .route(
+            "/internal/process-events",
+            post(handlers::internal::create_process_event),
+        )
+        .route(
+            "/internal/process-events/:id",
+            put(handlers::internal::update_process_event),
+        )
+        .route(
+            "/internal/process-artifacts",
+            post(handlers::internal::create_process_artifact),
+        )
         // Stats
         .route("/internal/stats", get(handlers::internal::get_stats))
         // WebSocket
