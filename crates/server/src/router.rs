@@ -1,4 +1,4 @@
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, post, put};
 use axum::Router;
 
 use crate::handlers;
@@ -71,6 +71,67 @@ pub fn create_router() -> Router<AppState> {
         .route(
             "/api/artifacts/:id/children",
             get(handlers::artifacts::get_artifact_children),
+        )
+        // Processes
+        .route(
+            "/api/processes",
+            post(handlers::processes::create_process)
+                .get(handlers::processes::list_processes),
+        )
+        .route(
+            "/api/processes/:id",
+            get(handlers::processes::get_process)
+                .put(handlers::processes::update_process)
+                .delete(handlers::processes::delete_process),
+        )
+        .route(
+            "/api/processes/:id/nodes",
+            post(handlers::processes::create_node)
+                .get(handlers::processes::list_nodes),
+        )
+        .route(
+            "/api/processes/:id/nodes/:nodeId",
+            put(handlers::processes::update_node)
+                .delete(handlers::processes::delete_node),
+        )
+        .route(
+            "/api/processes/:id/connections",
+            post(handlers::processes::create_connection)
+                .get(handlers::processes::list_connections),
+        )
+        .route(
+            "/api/processes/:id/connections/:connectionId",
+            delete(handlers::processes::delete_connection),
+        )
+        .route(
+            "/api/processes/:id/runs",
+            get(handlers::processes::list_runs),
+        )
+        .route(
+            "/api/processes/:id/runs/:runId",
+            get(handlers::processes::get_run),
+        )
+        .route(
+            "/api/processes/:id/runs/:runId/events",
+            get(handlers::processes::list_run_events),
+        )
+        .route(
+            "/api/processes/:id/runs/:runId/artifacts",
+            get(handlers::processes::list_run_artifacts),
+        )
+        .route(
+            "/api/process-artifacts/:id",
+            get(handlers::processes::get_artifact),
+        )
+        .route(
+            "/api/process-folders",
+            post(handlers::processes::create_folder)
+                .get(handlers::processes::list_folders),
+        )
+        .route(
+            "/api/process-folders/:id",
+            put(handlers::processes::update_folder)
+                .delete(handlers::processes::delete_folder),
         )
         // Stats
         .route("/api/stats", get(handlers::stats::get_stats))

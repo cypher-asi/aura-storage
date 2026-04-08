@@ -171,6 +171,7 @@ dependencies = [
  "aura-storage-db",
  "aura-storage-events",
  "aura-storage-logs",
+ "aura-storage-processes",
  "aura-storage-project-agents",
  "aura-storage-sessions",
  "aura-storage-specs",

@@ -2,6 +2,7 @@ pub mod artifacts;
 pub mod events;
 pub mod internal;
 pub mod logs;
+pub mod processes;
 pub mod project_agents;
 pub mod sessions;
 pub mod specs;
