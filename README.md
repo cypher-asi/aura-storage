@@ -6,7 +6,7 @@
 
 ## Overview
 
-aura-storage stores all project execution data for the AURA platform — specs, tasks, sessions, events, project agents, and log entries. All AURA clients (desktop, web, mobile) and aura-swarm (cloud agent orchestration) connect to this service for execution state.
+aura-storage stores all project execution data for the AURA platform — specs, tasks, sessions, events, project agents, log entries, and processes (workflow definitions, runs, and artifacts). All AURA clients (desktop, web, mobile) and aura-swarm (cloud agent orchestration) connect to this service for execution state.
 
 Projects themselves live in [aura-network](https://github.com/cypher-asi/aura-network) (the social layer). This service references project UUIDs from there. Together: aura-network owns "what exists", aura-storage owns "what happened".
 
@@ -68,6 +68,21 @@ Unlike aura-network, this service does **not** auto-create users. The `created_b
 
 ---
 
+## Processes
+
+Processes are visual workflow definitions built as directed node graphs. Each process contains:
+
+- **Nodes** — individual steps in the workflow. Types include `ignition` (entry point / trigger), `action` (agent-executed task), `condition` (branching logic), `prompt` (LLM prompt), `artifact` (output generation), `delay`, `merge`, `sub_process`, and `for_each`.
+- **Connections** — edges linking nodes together, defining execution order. Each connection has a source and target node with optional handles for multi-output branching.
+- **Runs** — each execution of a process creates a run, tracking status (`pending` → `running` → `completed`/`failed`/`cancelled`), trigger type (`manual` or `scheduled`), token usage, and cost.
+- **Events** — per-node execution records within a run. Each event captures the node's input, output, status, token usage, and model used.
+- **Artifacts** — outputs produced during a run (reports, documents, data files, media, code). Metadata is stored here; file content remains on the local machine.
+- **Folders** — optional grouping for organizing processes within an organization.
+
+Processes are scoped to an organization and optionally linked to a project. They can be scheduled via cron expressions for automatic execution, or triggered manually. Sub-processes are supported via `parent_run_id` on runs.
+
+The desktop client (aura-code) can operate in two modes: local-only (RocksDB) when `AURA_STORAGE_URL` is not set, or proxied to aura-storage for cross-team sharing when configured.
+
 ## API Reference
 
 See [docs/api.md](docs/api.md) for the full API reference.
@@ -81,7 +96,7 @@ See [docs/api.md](docs/api.md) for the full API reference.
 ```
 Auth:       zOS API (login) -> gets JWT
 Network:    aura-network (profiles, orgs, agents, feed, projects)
-Storage:    aura-storage (specs, tasks, sessions, events, project agents, logs)
+Storage:    aura-storage (specs, tasks, sessions, events, project agents, logs, processes)
 Billing:    zero-payments-server (credit balance, debit via JWT)
 Local:      RocksDB (terminal, filesystem, settings)
 ```
@@ -111,7 +126,7 @@ Same API as desktop — all endpoints are API-first. Authenticate via zOS, then 
 | Crate | Description |
 |---|---|
 | **aura-storage-core** | Shared types, error handling, pagination |
-| **aura-storage-db** | PostgreSQL connection pool and migrations (9 migrations) |
+| **aura-storage-db** | PostgreSQL connection pool and migrations (12 migrations) |
 | **aura-storage-auth** | JWT validation (Auth0 JWKS + HS256) and auth extractors |
 | **aura-storage-server** | Axum HTTP server, router, handlers, WebSocket |
 | **aura-storage-project-agents** | Project agent assignment and status tracking |
@@ -120,6 +135,7 @@ Same API as desktop — all endpoints are API-first. Authenticate via zOS, then 
 | **aura-storage-sessions** | Agent execution sessions |
 | **aura-storage-events** | Session events (typed event stream) |
 | **aura-storage-logs** | Structured log entries |
+| **aura-storage-processes** | Process workflows, nodes, connections, runs, events, and artifacts |
 
 ## License
 

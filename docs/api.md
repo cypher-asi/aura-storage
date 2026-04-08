@@ -2,7 +2,7 @@
 
 ## Overview
 
-Aura Storage provides persistent storage for project agents, specs, tasks, sessions, events, logs, artifacts, and real-time WebSocket notifications. All request and response bodies use **camelCase** JSON.
+Aura Storage provides persistent storage for project agents, specs, tasks, sessions, events, logs, artifacts, processes, and real-time WebSocket notifications. All request and response bodies use **camelCase** JSON.
 
 ---
 
@@ -987,6 +987,530 @@ List log entries for a project.
 
 ---
 
+## Processes
+
+Workflow definitions with visual node graphs, execution runs, and artifacts.
+
+### POST /api/processes
+
+**Auth:** JWT
+
+Create a new process.
+
+**Request Body:**
+
+| Field         | Type     | Required | Description                                              |
+|---------------|----------|----------|----------------------------------------------------------|
+| `orgId`       | UUID     | Yes      | Organization scope                                       |
+| `projectId`   | UUID     | No       | Associated project                                       |
+| `folderId`    | UUID     | No       | Parent folder                                            |
+| `name`        | string   | Yes      | Process name                                             |
+| `description` | string   | No       | Process description                                      |
+| `enabled`     | boolean  | No       | Whether the process is enabled (default: true)           |
+| `schedule`    | string   | No       | Cron expression for scheduled execution                  |
+| `tags`        | string[] | No       | Tags for categorization                                  |
+
+```json
+{
+  "orgId": "uuid",
+  "name": "Daily PR Summary",
+  "description": "Fetches open PRs and writes a summary",
+  "tags": ["github", "daily"]
+}
+```
+
+**Response:** `200` — Process
+
+```json
+{
+  "id": "uuid",
+  "orgId": "uuid",
+  "createdBy": "uuid",
+  "projectId": "uuid | null",
+  "folderId": "uuid | null",
+  "name": "string",
+  "description": "string",
+  "enabled": true,
+  "schedule": "string | null",
+  "tags": ["string"],
+  "lastRunAt": "datetime | null",
+  "nextRunAt": "datetime | null",
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+```
+
+---
+
+### GET /api/processes
+
+**Auth:** JWT
+
+List processes for an organization.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description            |
+|-----------|------|----------|------------------------|
+| `org_id`  | UUID | Yes      | Filter by organization |
+
+**Response:** `200` — Array of Process objects.
+
+---
+
+### GET /api/processes/:id
+
+**Auth:** JWT
+
+Get a single process by ID.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description        |
+|-----------|------|----------|--------------------|
+| `id`      | UUID | Yes      | The process's UUID |
+
+**Response:** `200` — Process
+
+---
+
+### PUT /api/processes/:id
+
+**Auth:** JWT
+
+Update a process. All fields are optional.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description        |
+|-----------|------|----------|--------------------|
+| `id`      | UUID | Yes      | The process's UUID |
+
+**Request Body:**
+
+| Field         | Type          | Required | Description                    |
+|---------------|---------------|----------|--------------------------------|
+| `name`        | string        | No       | New name                       |
+| `description` | string        | No       | New description                |
+| `projectId`   | UUID \| null  | No       | Associate/disassociate project |
+| `folderId`    | UUID \| null  | No       | Move to/from folder            |
+| `enabled`     | boolean       | No       | Enable/disable                 |
+| `schedule`    | string \| null| No       | Update cron schedule           |
+| `tags`        | string[]      | No       | Replace tags                   |
+| `lastRunAt`   | datetime \| null | No    | Last run timestamp             |
+| `nextRunAt`   | datetime \| null | No    | Next scheduled run             |
+
+**Response:** `200` — Process
+
+---
+
+### DELETE /api/processes/:id
+
+**Auth:** JWT
+
+Delete a process. CASCADE deletes all nodes, connections, runs, events, and artifacts.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description        |
+|-----------|------|----------|--------------------|
+| `id`      | UUID | Yes      | The process's UUID |
+
+**Response:** `204 No Content`
+
+---
+
+### GET /api/processes/:id/nodes
+
+**Auth:** JWT
+
+List all nodes for a process.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description        |
+|-----------|------|----------|--------------------|
+| `id`      | UUID | Yes      | The process's UUID |
+
+**Response:** `200` — Array of ProcessNode objects.
+
+```json
+{
+  "id": "uuid",
+  "processId": "uuid",
+  "nodeType": "ignition | action | condition | artifact | delay | merge | prompt | sub_process | for_each",
+  "label": "string",
+  "agentId": "uuid | null",
+  "prompt": "string",
+  "config": {},
+  "positionX": 0.0,
+  "positionY": 0.0,
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+```
+
+---
+
+### POST /api/processes/:id/nodes
+
+**Auth:** JWT
+
+Create a node in a process.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description        |
+|-----------|------|----------|--------------------|
+| `id`      | UUID | Yes      | The process's UUID |
+
+**Request Body:**
+
+| Field      | Type   | Required | Description                                                                           |
+|------------|--------|----------|---------------------------------------------------------------------------------------|
+| `nodeType` | string | Yes      | One of: `ignition`, `action`, `condition`, `artifact`, `delay`, `merge`, `prompt`, `sub_process`, `for_each` |
+| `label`    | string | No       | Display label                                                                         |
+| `agentId`  | UUID   | No       | Agent to execute this node                                                            |
+| `prompt`   | string | No       | Prompt text for the node                                                              |
+| `config`   | object | No       | Node-specific configuration                                                           |
+| `positionX`| float  | No       | X position in visual editor                                                           |
+| `positionY`| float  | No       | Y position in visual editor                                                           |
+
+**Response:** `200` — ProcessNode
+
+---
+
+### PUT /api/processes/:id/nodes/:nodeId
+
+**Auth:** JWT
+
+Update a node. All fields are optional.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description      |
+|-----------|------|----------|------------------|
+| `id`      | UUID | Yes      | Process UUID     |
+| `nodeId`  | UUID | Yes      | Node UUID        |
+
+**Request Body:**
+
+| Field      | Type          | Required | Description            |
+|------------|---------------|----------|------------------------|
+| `label`    | string        | No       | New label              |
+| `agentId`  | UUID \| null  | No       | Update/remove agent    |
+| `prompt`   | string        | No       | New prompt text        |
+| `config`   | object        | No       | New config             |
+| `positionX`| float         | No       | New X position         |
+| `positionY`| float         | No       | New Y position         |
+
+**Response:** `200` — ProcessNode
+
+---
+
+### DELETE /api/processes/:id/nodes/:nodeId
+
+**Auth:** JWT
+
+Delete a node. CASCADE deletes connections referencing this node.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description  |
+|-----------|------|----------|--------------|
+| `id`      | UUID | Yes      | Process UUID |
+| `nodeId`  | UUID | Yes      | Node UUID    |
+
+**Response:** `204 No Content`
+
+---
+
+### GET /api/processes/:id/connections
+
+**Auth:** JWT
+
+List all connections for a process.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description        |
+|-----------|------|----------|--------------------|
+| `id`      | UUID | Yes      | The process's UUID |
+
+**Response:** `200` — Array of ProcessNodeConnection objects.
+
+```json
+{
+  "id": "uuid",
+  "processId": "uuid",
+  "sourceNodeId": "uuid",
+  "sourceHandle": "string | null",
+  "targetNodeId": "uuid",
+  "targetHandle": "string | null"
+}
+```
+
+---
+
+### POST /api/processes/:id/connections
+
+**Auth:** JWT
+
+Create a connection between two nodes.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description        |
+|-----------|------|----------|--------------------|
+| `id`      | UUID | Yes      | The process's UUID |
+
+**Request Body:**
+
+| Field          | Type   | Required | Description        |
+|----------------|--------|----------|--------------------|
+| `sourceNodeId` | UUID   | Yes      | Source node UUID   |
+| `sourceHandle` | string | No       | Source handle name  |
+| `targetNodeId` | UUID   | Yes      | Target node UUID   |
+| `targetHandle` | string | No       | Target handle name  |
+
+**Response:** `200` — ProcessNodeConnection
+
+---
+
+### DELETE /api/processes/:id/connections/:connectionId
+
+**Auth:** JWT
+
+Delete a connection.
+
+**Path Parameters:**
+
+| Parameter      | Type | Required | Description     |
+|----------------|------|----------|-----------------|
+| `id`           | UUID | Yes      | Process UUID    |
+| `connectionId` | UUID | Yes      | Connection UUID |
+
+**Response:** `204 No Content`
+
+---
+
+### GET /api/processes/:id/runs
+
+**Auth:** JWT
+
+List all runs for a process.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description        |
+|-----------|------|----------|--------------------|
+| `id`      | UUID | Yes      | The process's UUID |
+
+**Response:** `200` — Array of ProcessRun objects.
+
+```json
+{
+  "id": "uuid",
+  "processId": "uuid",
+  "status": "pending | running | completed | failed | cancelled",
+  "trigger": "scheduled | manual",
+  "error": "string | null",
+  "startedAt": "datetime",
+  "completedAt": "datetime | null",
+  "totalInputTokens": 0,
+  "totalOutputTokens": 0,
+  "costUsd": 0.0,
+  "output": "string | null",
+  "parentRunId": "uuid | null",
+  "inputOverride": "string | null",
+  "createdAt": "datetime"
+}
+```
+
+---
+
+### GET /api/processes/:id/runs/:runId
+
+**Auth:** JWT
+
+Get a single run by ID.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description  |
+|-----------|------|----------|--------------|
+| `id`      | UUID | Yes      | Process UUID |
+| `runId`   | UUID | Yes      | Run UUID     |
+
+**Response:** `200` — ProcessRun
+
+---
+
+### GET /api/processes/:id/runs/:runId/events
+
+**Auth:** JWT
+
+List all events for a run.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description  |
+|-----------|------|----------|--------------|
+| `id`      | UUID | Yes      | Process UUID |
+| `runId`   | UUID | Yes      | Run UUID     |
+
+**Response:** `200` — Array of ProcessEvent objects.
+
+```json
+{
+  "id": "uuid",
+  "runId": "uuid",
+  "nodeId": "uuid",
+  "processId": "uuid",
+  "status": "pending | running | completed | failed | skipped",
+  "inputSnapshot": "string",
+  "output": "string",
+  "startedAt": "datetime",
+  "completedAt": "datetime | null",
+  "inputTokens": 0,
+  "outputTokens": 0,
+  "model": "string | null",
+  "contentBlocks": {}
+}
+```
+
+---
+
+### GET /api/processes/:id/runs/:runId/artifacts
+
+**Auth:** JWT
+
+List all artifacts for a run.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description  |
+|-----------|------|----------|--------------|
+| `id`      | UUID | Yes      | Process UUID |
+| `runId`   | UUID | Yes      | Run UUID     |
+
+**Response:** `200` — Array of ProcessArtifact objects.
+
+```json
+{
+  "id": "uuid",
+  "processId": "uuid",
+  "runId": "uuid",
+  "nodeId": "uuid",
+  "artifactType": "report | document | data | media | code | custom",
+  "name": "string",
+  "filePath": "string",
+  "sizeBytes": 0,
+  "metadata": {},
+  "createdAt": "datetime"
+}
+```
+
+---
+
+### GET /api/process-artifacts/:id
+
+**Auth:** JWT
+
+Get a single process artifact by ID (metadata only).
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description    |
+|-----------|------|----------|----------------|
+| `id`      | UUID | Yes      | Artifact UUID  |
+
+**Response:** `200` — ProcessArtifact
+
+---
+
+### GET /api/process-folders
+
+**Auth:** JWT
+
+List process folders for an organization.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description            |
+|-----------|------|----------|------------------------|
+| `org_id`  | UUID | Yes      | Filter by organization |
+
+**Response:** `200` — Array of ProcessFolder objects.
+
+```json
+{
+  "id": "uuid",
+  "orgId": "uuid",
+  "createdBy": "uuid",
+  "name": "string",
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+```
+
+---
+
+### POST /api/process-folders
+
+**Auth:** JWT
+
+Create a process folder.
+
+**Request Body:**
+
+| Field   | Type   | Required | Description            |
+|---------|--------|----------|------------------------|
+| `orgId` | UUID   | Yes      | Organization scope     |
+| `name`  | string | Yes      | Folder name            |
+
+**Response:** `200` — ProcessFolder
+
+---
+
+### PUT /api/process-folders/:id
+
+**Auth:** JWT
+
+Update a process folder.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description  |
+|-----------|------|----------|--------------|
+| `id`      | UUID | Yes      | Folder UUID  |
+
+**Request Body:**
+
+| Field  | Type   | Required | Description |
+|--------|--------|----------|-------------|
+| `name` | string | No       | New name    |
+
+**Response:** `200` — ProcessFolder
+
+---
+
+### DELETE /api/process-folders/:id
+
+**Auth:** JWT
+
+Delete a process folder. Processes in this folder have their `folderId` set to null.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description  |
+|-----------|------|----------|--------------|
+| `id`      | UUID | Yes      | Folder UUID  |
+
+**Response:** `204 No Content`
+
+---
+
 ## Internal Endpoints
 
 These endpoints are used for service-to-service communication and require the `X-Internal-Token` header instead of a JWT. Create endpoints include `projectId` and `createdBy` in the request body (since there is no JWT to derive from).
@@ -1585,6 +2109,206 @@ Delete an artifact.
 Get aggregate statistics. Same query parameters as [GET /api/stats](#get-apistats).
 
 **Response:** `200` — Same response format as [GET /api/stats](#get-apistats).
+
+---
+
+### Processes
+
+#### GET /internal/processes/:id
+
+**Auth:** Internal
+
+Get a single process by ID (used by executor).
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description        |
+|-----------|------|----------|--------------------|
+| `id`      | UUID | Yes      | The process's UUID |
+
+**Response:** `200` — Process
+
+---
+
+#### GET /internal/processes/:id/nodes
+
+**Auth:** Internal
+
+List all nodes for a process (used by executor).
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description        |
+|-----------|------|----------|--------------------|
+| `id`      | UUID | Yes      | The process's UUID |
+
+**Response:** `200` — Array of ProcessNode objects.
+
+---
+
+#### GET /internal/processes/:id/connections
+
+**Auth:** Internal
+
+List all connections for a process (used by executor).
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description        |
+|-----------|------|----------|--------------------|
+| `id`      | UUID | Yes      | The process's UUID |
+
+**Response:** `200` — Array of ProcessNodeConnection objects.
+
+---
+
+#### GET /internal/processes/scheduled
+
+**Auth:** Internal
+
+List all enabled processes that have a schedule and a `nextRunAt` in the past (used by scheduler).
+
+**Response:** `200` — Array of Process objects.
+
+---
+
+#### PUT /internal/processes/:id
+
+**Auth:** Internal
+
+Update a process (used by scheduler to update `nextRunAt`/`lastRunAt`).
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description        |
+|-----------|------|----------|--------------------|
+| `id`      | UUID | Yes      | The process's UUID |
+
+**Request Body:** Same as [PUT /api/processes/:id](#put-apiprocessesid).
+
+**Response:** `200` — Process
+
+---
+
+#### POST /internal/process-runs
+
+**Auth:** Internal
+
+Create a process run.
+
+**Request Body:**
+
+| Field           | Type   | Required | Description                              |
+|-----------------|--------|----------|------------------------------------------|
+| `id`            | UUID   | No       | Client-supplied ID (generated if omitted)|
+| `processId`     | UUID   | Yes      | The process's UUID                       |
+| `trigger`       | string | No       | `scheduled` or `manual` (default: manual)|
+| `parentRunId`   | UUID   | No       | Parent run for sub-processes             |
+| `inputOverride` | string | No       | Override input text                      |
+
+**Response:** `200` — ProcessRun
+
+---
+
+#### PUT /internal/process-runs/:id
+
+**Auth:** Internal
+
+Update a process run's status and metrics.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id`      | UUID | Yes      | Run UUID    |
+
+**Request Body:**
+
+| Field              | Type             | Required | Description              |
+|--------------------|------------------|----------|--------------------------|
+| `status`           | string           | No       | New status               |
+| `error`            | string \| null   | No       | Error message            |
+| `completedAt`      | datetime \| null | No       | Completion timestamp     |
+| `totalInputTokens` | integer          | No       | Cumulative input tokens  |
+| `totalOutputTokens`| integer          | No       | Cumulative output tokens |
+| `costUsd`          | float            | No       | Estimated cost           |
+| `output`           | string \| null   | No       | Run output text          |
+
+**Response:** `200` — ProcessRun
+
+---
+
+#### POST /internal/process-events
+
+**Auth:** Internal
+
+Create a process event.
+
+**Request Body:**
+
+| Field           | Type   | Required | Description                              |
+|-----------------|--------|----------|------------------------------------------|
+| `id`            | UUID   | No       | Client-supplied ID (generated if omitted)|
+| `runId`         | UUID   | Yes      | The run's UUID                           |
+| `nodeId`        | UUID   | Yes      | The node's UUID                          |
+| `processId`     | UUID   | Yes      | The process's UUID                       |
+| `status`        | string | No       | Event status (default: pending)          |
+| `inputSnapshot` | string | No       | Input data snapshot                      |
+| `output`        | string | No       | Event output                             |
+
+**Response:** `200` — ProcessEvent
+
+---
+
+#### PUT /internal/process-events/:id
+
+**Auth:** Internal
+
+Update a process event.
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description  |
+|-----------|------|----------|--------------|
+| `id`      | UUID | Yes      | Event UUID   |
+
+**Request Body:**
+
+| Field           | Type             | Required | Description            |
+|-----------------|------------------|----------|------------------------|
+| `status`        | string           | No       | New status             |
+| `output`        | string           | No       | Updated output         |
+| `completedAt`   | datetime \| null | No       | Completion timestamp   |
+| `inputTokens`   | integer          | No       | Input tokens used      |
+| `outputTokens`  | integer          | No       | Output tokens used     |
+| `model`         | string           | No       | LLM model used         |
+| `contentBlocks` | object           | No       | Content block data     |
+
+**Response:** `200` — ProcessEvent
+
+---
+
+#### POST /internal/process-artifacts
+
+**Auth:** Internal
+
+Create a process artifact (metadata only — file content stays local).
+
+**Request Body:**
+
+| Field          | Type    | Required | Description                              |
+|----------------|---------|----------|------------------------------------------|
+| `id`           | UUID    | No       | Client-supplied ID (generated if omitted)|
+| `processId`    | UUID    | Yes      | The process's UUID                       |
+| `runId`        | UUID    | Yes      | The run's UUID                           |
+| `nodeId`       | UUID    | Yes      | The node's UUID                          |
+| `artifactType` | string  | Yes      | One of: `report`, `document`, `data`, `media`, `code`, `custom` |
+| `name`         | string  | Yes      | Artifact name                            |
+| `filePath`     | string  | Yes      | Local file path                          |
+| `sizeBytes`    | integer | No       | File size in bytes (default: 0)          |
+| `metadata`     | object  | No       | Freeform metadata                        |
+
+**Response:** `200` — ProcessArtifact
 
 ---
 
