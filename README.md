@@ -51,7 +51,7 @@ Returns:
 | `AUTH_COOKIE_SECRET` | Yes | Shared secret for HS256 token validation (same as aura-network) |
 | `INTERNAL_SERVICE_TOKEN` | Yes | Token for service-to-service auth (aura-swarm -> aura-storage) |
 | `PORT` | No | Server port (default: 3000) |
-| `AURA_NETWORK_URL` | No | aura-network base URL for cost data in stats |
+| `AURA_NETWORK_URL` | No | aura-network base URL for org membership checks and cost data in stats |
 | `AURA_NETWORK_TOKEN` | No | Internal service token for aura-network |
 | `CORS_ORIGINS` | No | Comma-separated allowed origins. Omit for permissive (dev mode) |
 | `RUST_LOG` | No | Tracing filter (default: `aura_storage=debug,tower_http=debug,info`) |
@@ -114,6 +114,8 @@ On app load: fetch projects from aura-network, then fetch execution data from au
 ```
 
 Use `X-Internal-Token` for aura-storage internal endpoints. Use the user's JWT for aura-network activity posts and credit debits.
+
+Public `/api/processes` and `/api/process-folders` endpoints validate org membership through Aura Network before returning or mutating org-scoped data. Desktop-triggered process run, event, and artifact writes now use JWT-backed public process routes; the internal `/internal/process-*` endpoints remain available for service-to-service executor flows.
 
 ### From Mobile
 

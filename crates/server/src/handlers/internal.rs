@@ -3,16 +3,16 @@ use axum::http::StatusCode;
 use axum::Json;
 use uuid::Uuid;
 
+use aura_storage_artifacts::{models as artifact_models, repo as artifact_repo};
 use aura_storage_auth::InternalAuth;
 use aura_storage_core::AppError;
 use aura_storage_events::{models as event_models, repo as event_repo};
 use aura_storage_logs::{models as log_models, repo as log_repo};
+use aura_storage_processes::{models as process_models, repo as process_repo};
 use aura_storage_project_agents::{models as pa_models, repo as pa_repo};
 use aura_storage_sessions::{models as session_models, repo as session_repo};
 use aura_storage_specs::{models as spec_models, repo as spec_repo};
 use aura_storage_tasks::{models as task_models, repo as task_repo};
-use aura_storage_artifacts::{models as artifact_models, repo as artifact_repo};
-use aura_storage_processes::{models as process_models, repo as process_repo};
 
 use crate::state::AppState;
 
@@ -206,9 +206,14 @@ pub async fn list_logs(
 ) -> Result<Json<Vec<log_models::LogEntry>>, AppError> {
     let limit = query.limit.unwrap_or(100).min(500).max(1);
     let offset = query.offset.unwrap_or(0).max(0);
-    let entries =
-        log_repo::list_by_project(&state.pool, project_id, query.level.as_deref(), limit, offset)
-            .await?;
+    let entries = log_repo::list_by_project(
+        &state.pool,
+        project_id,
+        query.level.as_deref(),
+        limit,
+        offset,
+    )
+    .await?;
     Ok(Json(entries))
 }
 
@@ -221,8 +226,13 @@ pub async fn create_project_agent(
     State(state): State<AppState>,
     Json(input): Json<InternalCreateProjectAgentRequest>,
 ) -> Result<Json<pa_models::ProjectAgent>, AppError> {
-    let agent =
-        pa_repo::create(&state.pool, input.project_id, input.created_by, &input.agent).await?;
+    let agent = pa_repo::create(
+        &state.pool,
+        input.project_id,
+        input.created_by,
+        &input.agent,
+    )
+    .await?;
     Ok(Json(agent))
 }
 
@@ -295,9 +305,11 @@ pub async fn delete_project_data(
     State(state): State<AppState>,
     Path(project_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let mut tx = state.pool.begin().await.map_err(|e| {
-        AppError::Internal(format!("failed to begin transaction: {e}"))
-    })?;
+    let mut tx = state
+        .pool
+        .begin()
+        .await
+        .map_err(|e| AppError::Internal(format!("failed to begin transaction: {e}")))?;
 
     let events = sqlx::query("DELETE FROM session_events WHERE project_id = $1")
         .bind(project_id)
@@ -347,9 +359,9 @@ pub async fn delete_project_data(
         .await?
         .rows_affected();
 
-    tx.commit().await.map_err(|e| {
-        AppError::Internal(format!("failed to commit transaction: {e}"))
-    })?;
+    tx.commit()
+        .await
+        .map_err(|e| AppError::Internal(format!("failed to commit transaction: {e}")))?;
 
     tracing::info!(
         project_id = %project_id,
@@ -534,9 +546,13 @@ pub async fn create_artifact(
     State(state): State<AppState>,
     Json(input): Json<InternalCreateArtifactRequest>,
 ) -> Result<Json<artifact_models::Artifact>, AppError> {
-    let artifact =
-        artifact_repo::create(&state.pool, input.project_id, input.created_by, &input.artifact)
-            .await?;
+    let artifact = artifact_repo::create(
+        &state.pool,
+        input.project_id,
+        input.created_by,
+        &input.artifact,
+    )
+    .await?;
     Ok(Json(artifact))
 }
 

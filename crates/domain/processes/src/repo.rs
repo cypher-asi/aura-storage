@@ -155,7 +155,10 @@ pub async fn update_process(
     id: Uuid,
     input: &UpdateProcessRequest,
 ) -> Result<Process, AppError> {
-    let tags = input.tags.as_ref().map(|t| serde_json::to_value(t).unwrap_or_default());
+    let tags = input
+        .tags
+        .as_ref()
+        .map(|t| serde_json::to_value(t).unwrap_or_default());
 
     sqlx::query_as::<_, Process>(
         r#"
@@ -455,10 +458,7 @@ pub async fn create_event(
     .map_err(AppError::from)
 }
 
-pub async fn list_events(
-    pool: &PgPool,
-    run_id: Uuid,
-) -> Result<Vec<ProcessEvent>, AppError> {
+pub async fn list_events(pool: &PgPool, run_id: Uuid) -> Result<Vec<ProcessEvent>, AppError> {
     sqlx::query_as::<_, ProcessEvent>(
         "SELECT * FROM process_events WHERE run_id = $1 ORDER BY started_at ASC",
     )
@@ -466,6 +466,14 @@ pub async fn list_events(
     .fetch_all(pool)
     .await
     .map_err(AppError::from)
+}
+
+pub async fn get_event(pool: &PgPool, id: Uuid) -> Result<ProcessEvent, AppError> {
+    sqlx::query_as::<_, ProcessEvent>("SELECT * FROM process_events WHERE id = $1")
+        .bind(id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Process event not found".into()))
 }
 
 pub async fn update_event(

@@ -75,8 +75,7 @@ pub fn create_router() -> Router<AppState> {
         // Processes
         .route(
             "/api/processes",
-            post(handlers::processes::create_process)
-                .get(handlers::processes::list_processes),
+            post(handlers::processes::create_process).get(handlers::processes::list_processes),
         )
         .route(
             "/api/processes/:id",
@@ -86,18 +85,15 @@ pub fn create_router() -> Router<AppState> {
         )
         .route(
             "/api/processes/:id/nodes",
-            post(handlers::processes::create_node)
-                .get(handlers::processes::list_nodes),
+            post(handlers::processes::create_node).get(handlers::processes::list_nodes),
         )
         .route(
             "/api/processes/:id/nodes/:nodeId",
-            put(handlers::processes::update_node)
-                .delete(handlers::processes::delete_node),
+            put(handlers::processes::update_node).delete(handlers::processes::delete_node),
         )
         .route(
             "/api/processes/:id/connections",
-            post(handlers::processes::create_connection)
-                .get(handlers::processes::list_connections),
+            post(handlers::processes::create_connection).get(handlers::processes::list_connections),
         )
         .route(
             "/api/processes/:id/connections/:connectionId",
@@ -105,19 +101,24 @@ pub fn create_router() -> Router<AppState> {
         )
         .route(
             "/api/processes/:id/runs",
-            get(handlers::processes::list_runs),
+            post(handlers::processes::create_run).get(handlers::processes::list_runs),
         )
         .route(
             "/api/processes/:id/runs/:runId",
-            get(handlers::processes::get_run),
+            get(handlers::processes::get_run).put(handlers::processes::update_run),
         )
         .route(
             "/api/processes/:id/runs/:runId/events",
-            get(handlers::processes::list_run_events),
+            post(handlers::processes::create_run_event).get(handlers::processes::list_run_events),
+        )
+        .route(
+            "/api/processes/:id/runs/:runId/events/:eventId",
+            put(handlers::processes::update_run_event),
         )
         .route(
             "/api/processes/:id/runs/:runId/artifacts",
-            get(handlers::processes::list_run_artifacts),
+            post(handlers::processes::create_run_artifact)
+                .get(handlers::processes::list_run_artifacts),
         )
         .route(
             "/api/process-artifacts/:id",
@@ -125,13 +126,11 @@ pub fn create_router() -> Router<AppState> {
         )
         .route(
             "/api/process-folders",
-            post(handlers::processes::create_folder)
-                .get(handlers::processes::list_folders),
+            post(handlers::processes::create_folder).get(handlers::processes::list_folders),
         )
         .route(
             "/api/process-folders/:id",
-            put(handlers::processes::update_folder)
-                .delete(handlers::processes::delete_folder),
+            put(handlers::processes::update_folder).delete(handlers::processes::delete_folder),
         )
         // Stats
         .route("/api/stats", get(handlers::stats::get_stats))
@@ -191,10 +190,7 @@ pub fn create_router() -> Router<AppState> {
             get(handlers::internal::get_project_agent_count),
         )
         // Specs
-        .route(
-            "/internal/specs",
-            post(handlers::internal::create_spec),
-        )
+        .route("/internal/specs", post(handlers::internal::create_spec))
         .route(
             "/internal/projects/:projectId/specs",
             get(handlers::internal::list_specs),
@@ -206,10 +202,7 @@ pub fn create_router() -> Router<AppState> {
                 .delete(handlers::internal::delete_spec),
         )
         // Tasks
-        .route(
-            "/internal/tasks",
-            post(handlers::internal::create_task),
-        )
+        .route("/internal/tasks", post(handlers::internal::create_task))
         .route(
             "/internal/projects/:projectId/tasks",
             get(handlers::internal::list_tasks),
@@ -244,8 +237,7 @@ pub fn create_router() -> Router<AppState> {
         )
         .route(
             "/internal/processes/:id",
-            get(handlers::internal::get_process)
-                .put(handlers::internal::update_process),
+            get(handlers::internal::get_process).put(handlers::internal::update_process),
         )
         .route(
             "/internal/processes/:id/nodes",

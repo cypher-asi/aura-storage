@@ -4,7 +4,7 @@
 /// Create test DB: `createdb aura_storage_test`
 use std::net::SocketAddr;
 
-use axum::Router;
+use axum::{extract::Path, http::StatusCode, routing::get, Router};
 use reqwest::Client;
 use serde_json::{json, Value};
 use tower_http::limit::RequestBodyLimitLayer;
@@ -12,6 +12,7 @@ use tower_http::trace::TraceLayer;
 use uuid::Uuid;
 
 use aura_storage_auth::{InternalToken, TokenValidator};
+use aura_storage_processes::{models as process_models, repo as process_repo};
 use aura_storage_server::router;
 use aura_storage_server::state::AppState;
 
@@ -20,8 +21,13 @@ const TEST_COOKIE_SECRET: &str = "test-cookie-secret-for-process-tests";
 
 const SELF_SIGNED_KID: &str = "jFNXMnFjGrSoDafnLQBohoCNalWcFcTjnKEbkRzWFBHyYJFikdLMHP";
 
+#[derive(Clone)]
+struct MockNetworkState {
+    allow: bool,
+}
+
 fn generate_test_jwt() -> String {
-    use jsonwebtoken::{encode, EncodingKey, Header, Algorithm};
+    use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
     use serde::Serialize;
 
     #[derive(Serialize)]
@@ -42,10 +48,54 @@ fn generate_test_jwt() -> String {
         exp: chrono::Utc::now().timestamp() + 3600,
     };
 
-    encode(&header, &claims, &EncodingKey::from_secret(TEST_COOKIE_SECRET.as_bytes())).unwrap()
+    encode(
+        &header,
+        &claims,
+        &EncodingKey::from_secret(TEST_COOKIE_SECRET.as_bytes()),
+    )
+    .unwrap()
 }
 
-async fn spawn_test_server() -> (SocketAddr, sqlx::PgPool) {
+async fn spawn_network_mock(allow: bool) -> String {
+    async fn get_org(
+        Path(_org_id): Path<Uuid>,
+        axum::extract::State(state): axum::extract::State<MockNetworkState>,
+        headers: axum::http::HeaderMap,
+    ) -> StatusCode {
+        let has_bearer = headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|value| value.to_str().ok())
+            .map(|value| value.starts_with("Bearer "))
+            .unwrap_or(false);
+
+        if !has_bearer {
+            return StatusCode::UNAUTHORIZED;
+        }
+
+        if state.allow {
+            StatusCode::OK
+        } else {
+            StatusCode::FORBIDDEN
+        }
+    }
+
+    let app = Router::new()
+        .route("/api/orgs/:orgId", get(get_org))
+        .with_state(MockNetworkState { allow });
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("Failed to bind network mock");
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    format!("http://{addr}")
+}
+
+async fn spawn_storage_server(network_url: Option<String>) -> (SocketAddr, sqlx::PgPool) {
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://localhost/aura_storage_test".into());
 
@@ -65,7 +115,7 @@ async fn spawn_test_server() -> (SocketAddr, sqlx::PgPool) {
         internal_token: InternalToken(TEST_INTERNAL_TOKEN.into()),
         events_tx,
         http_client: reqwest::Client::new(),
-        aura_network_url: None,
+        aura_network_url: network_url,
         aura_network_token: None,
     };
 
@@ -84,6 +134,15 @@ async fn spawn_test_server() -> (SocketAddr, sqlx::PgPool) {
     });
 
     (addr, pool)
+}
+
+async fn spawn_test_server() -> (SocketAddr, sqlx::PgPool) {
+    spawn_storage_server(None).await
+}
+
+async fn spawn_authed_test_server(allow: bool) -> (SocketAddr, sqlx::PgPool) {
+    let network_url = spawn_network_mock(allow).await;
+    spawn_storage_server(Some(network_url)).await
 }
 
 // ---------------------------------------------------------------------------
@@ -149,8 +208,8 @@ async fn internal_endpoints_reject_wrong_token() {
 }
 
 #[tokio::test]
-async fn full_process_lifecycle_via_internal() {
-    let (addr, _pool) = spawn_test_server().await;
+async fn full_process_lifecycle_via_public_writes() {
+    let (addr, _pool) = spawn_authed_test_server(true).await;
     let client = Client::new();
     let base = format!("http://{addr}");
     let jwt = generate_test_jwt();
@@ -280,7 +339,9 @@ async fn full_process_lifecycle_via_internal() {
 
     // Update node via public
     let resp = client
-        .put(format!("{base}/api/processes/{process_id}/nodes/{node2_id}"))
+        .put(format!(
+            "{base}/api/processes/{process_id}/nodes/{node2_id}"
+        ))
         .header("Authorization", format!("Bearer {jwt}"))
         .json(&json!({"label": "Renamed Action"}))
         .send()
@@ -328,7 +389,9 @@ async fn full_process_lifecycle_via_internal() {
 
     // List connections via internal
     let resp = client
-        .get(format!("{base}/internal/processes/{process_id}/connections"))
+        .get(format!(
+            "{base}/internal/processes/{process_id}/connections"
+        ))
         .header("X-Internal-Token", TEST_INTERNAL_TOKEN)
         .send()
         .await
@@ -339,7 +402,9 @@ async fn full_process_lifecycle_via_internal() {
 
     // Delete connection via public
     let resp = client
-        .delete(format!("{base}/api/processes/{process_id}/connections/{conn_id}"))
+        .delete(format!(
+            "{base}/api/processes/{process_id}/connections/{conn_id}"
+        ))
         .header("Authorization", format!("Bearer {jwt}"))
         .send()
         .await
@@ -361,7 +426,9 @@ async fn full_process_lifecycle_via_internal() {
 
     // Delete node via public (delete node2, recreate for rest of lifecycle)
     let resp = client
-        .delete(format!("{base}/api/processes/{process_id}/nodes/{node2_id}"))
+        .delete(format!(
+            "{base}/api/processes/{process_id}/nodes/{node2_id}"
+        ))
         .header("Authorization", format!("Bearer {jwt}"))
         .send()
         .await
@@ -382,12 +449,11 @@ async fn full_process_lifecycle_via_internal() {
         .unwrap();
     assert_eq!(resp.status(), 200);
 
-    // Create run via internal
+    // Create run via public JWT route
     let resp = client
-        .post(format!("{base}/internal/process-runs"))
-        .header("X-Internal-Token", TEST_INTERNAL_TOKEN)
+        .post(format!("{base}/api/processes/{process_id}/runs"))
+        .header("Authorization", format!("Bearer {jwt}"))
         .json(&json!({
-            "processId": process_id,
             "trigger": "manual"
         }))
         .send()
@@ -398,10 +464,10 @@ async fn full_process_lifecycle_via_internal() {
     let run_id = run["id"].as_str().unwrap();
     assert_eq!(run["status"], "pending");
 
-    // Update run status via internal
+    // Update run status via public JWT route
     let resp = client
-        .put(format!("{base}/internal/process-runs/{run_id}"))
-        .header("X-Internal-Token", TEST_INTERNAL_TOKEN)
+        .put(format!("{base}/api/processes/{process_id}/runs/{run_id}"))
+        .header("Authorization", format!("Bearer {jwt}"))
         .json(&json!({"status": "running"}))
         .send()
         .await
@@ -433,14 +499,14 @@ async fn full_process_lifecycle_via_internal() {
     let single_run: Value = resp.json().await.unwrap();
     assert_eq!(single_run["id"], run_id);
 
-    // Create event via internal
+    // Create event via public JWT route
     let resp = client
-        .post(format!("{base}/internal/process-events"))
-        .header("X-Internal-Token", TEST_INTERNAL_TOKEN)
+        .post(format!(
+            "{base}/api/processes/{process_id}/runs/{run_id}/events"
+        ))
+        .header("Authorization", format!("Bearer {jwt}"))
         .json(&json!({
-            "runId": run_id,
             "nodeId": node_id,
-            "processId": process_id,
             "status": "running"
         }))
         .send()
@@ -450,10 +516,12 @@ async fn full_process_lifecycle_via_internal() {
     let event: Value = resp.json().await.unwrap();
     let event_id = event["id"].as_str().unwrap();
 
-    // Update event via internal
+    // Update event via public JWT route
     let resp = client
-        .put(format!("{base}/internal/process-events/{event_id}"))
-        .header("X-Internal-Token", TEST_INTERNAL_TOKEN)
+        .put(format!(
+            "{base}/api/processes/{process_id}/runs/{run_id}/events/{event_id}"
+        ))
+        .header("Authorization", format!("Bearer {jwt}"))
         .json(&json!({
             "status": "completed",
             "output": "Task done",
@@ -467,7 +535,9 @@ async fn full_process_lifecycle_via_internal() {
 
     // List events
     let resp = client
-        .get(format!("{base}/api/processes/{process_id}/runs/{run_id}/events"))
+        .get(format!(
+            "{base}/api/processes/{process_id}/runs/{run_id}/events"
+        ))
         .header("Authorization", format!("Bearer {jwt}"))
         .send()
         .await
@@ -477,13 +547,13 @@ async fn full_process_lifecycle_via_internal() {
     assert_eq!(events.len(), 1);
     assert_eq!(events[0]["status"], "completed");
 
-    // Create artifact via internal
+    // Create artifact via public JWT route
     let resp = client
-        .post(format!("{base}/internal/process-artifacts"))
-        .header("X-Internal-Token", TEST_INTERNAL_TOKEN)
+        .post(format!(
+            "{base}/api/processes/{process_id}/runs/{run_id}/artifacts"
+        ))
+        .header("Authorization", format!("Bearer {jwt}"))
         .json(&json!({
-            "processId": process_id,
-            "runId": run_id,
             "nodeId": node_id,
             "artifactType": "report",
             "name": "output.md",
@@ -497,7 +567,9 @@ async fn full_process_lifecycle_via_internal() {
 
     // List run artifacts
     let resp = client
-        .get(format!("{base}/api/processes/{process_id}/runs/{run_id}/artifacts"))
+        .get(format!(
+            "{base}/api/processes/{process_id}/runs/{run_id}/artifacts"
+        ))
         .header("Authorization", format!("Bearer {jwt}"))
         .send()
         .await
@@ -540,7 +612,7 @@ async fn full_process_lifecycle_via_internal() {
 
 #[tokio::test]
 async fn cross_org_isolation() {
-    let (addr, _pool) = spawn_test_server().await;
+    let (addr, _pool) = spawn_authed_test_server(true).await;
     let client = Client::new();
     let base = format!("http://{addr}");
     let jwt = generate_test_jwt();
@@ -571,7 +643,7 @@ async fn cross_org_isolation() {
 
 #[tokio::test]
 async fn folder_lifecycle() {
-    let (addr, _pool) = spawn_test_server().await;
+    let (addr, _pool) = spawn_authed_test_server(true).await;
     let client = Client::new();
     let base = format!("http://{addr}");
     let jwt = generate_test_jwt();
@@ -622,8 +694,62 @@ async fn folder_lifecycle() {
 }
 
 #[tokio::test]
+async fn public_process_writes_are_rejected_without_org_membership() {
+    let jwt = generate_test_jwt();
+    let (addr, pool) = spawn_authed_test_server(false).await;
+    let client = Client::new();
+    let base = format!("http://{addr}");
+    let org_id = Uuid::new_v4();
+    let project_id = Uuid::new_v4();
+
+    let resp = client
+        .post(format!("{base}/api/processes"))
+        .header("Authorization", format!("Bearer {jwt}"))
+        .json(&json!({"orgId": org_id, "name": "Denied Process"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 403);
+
+    let resp = client
+        .post(format!("{base}/api/process-folders"))
+        .header("Authorization", format!("Bearer {jwt}"))
+        .json(&json!({"orgId": org_id, "name": "Denied Folder"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 403);
+
+    let process = process_repo::create_process(
+        &pool,
+        Uuid::new_v4(),
+        &process_models::CreateProcessRequest {
+            org_id,
+            project_id: Some(project_id),
+            folder_id: None,
+            name: "Direct Insert".into(),
+            description: Some("Direct DB row".into()),
+            enabled: Some(true),
+            schedule: None,
+            tags: None,
+        },
+    )
+    .await
+    .unwrap();
+
+    let resp = client
+        .post(format!("{base}/api/processes/{}/runs", process.id))
+        .header("Authorization", format!("Bearer {jwt}"))
+        .json(&json!({"trigger": "manual"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 403);
+}
+
+#[tokio::test]
 async fn scheduled_processes_internal() {
-    let (addr, _pool) = spawn_test_server().await;
+    let (addr, _pool) = spawn_authed_test_server(true).await;
     let client = Client::new();
     let base = format!("http://{addr}");
     let jwt = generate_test_jwt();
@@ -668,13 +794,9 @@ async fn scheduled_processes_internal() {
     assert_eq!(resp.status(), 200);
     let scheduled: Vec<Value> = resp.json().await.unwrap();
     // Should include our enabled+scheduled one (might include others from parallel tests)
-    let has_ours = scheduled
-        .iter()
-        .any(|p| p["name"] == "Scheduled Process");
+    let has_ours = scheduled.iter().any(|p| p["name"] == "Scheduled Process");
     assert!(has_ours, "Should find our scheduled process");
-    let has_disabled = scheduled
-        .iter()
-        .any(|p| p["name"] == "Disabled Scheduled");
+    let has_disabled = scheduled.iter().any(|p| p["name"] == "Disabled Scheduled");
     assert!(!has_disabled, "Should NOT find disabled process");
 }
 

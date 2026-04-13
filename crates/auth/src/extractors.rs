@@ -11,6 +11,7 @@ use crate::validate::{TokenClaims, TokenValidator};
 pub struct AuthUser {
     pub user_id: String,
     pub claims: TokenClaims,
+    pub bearer_token: String,
 }
 
 #[async_trait]
@@ -39,7 +40,11 @@ where
             .ok_or_else(|| AppError::Unauthorized("Token missing user ID".into()))?
             .to_string();
 
-        Ok(AuthUser { user_id, claims })
+        Ok(AuthUser {
+            user_id,
+            claims,
+            bearer_token: token.to_string(),
+        })
     }
 }
 
