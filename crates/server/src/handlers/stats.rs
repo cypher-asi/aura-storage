@@ -176,9 +176,16 @@ async fn query_stats(
                     (SELECT COUNT(*) FROM tasks WHERE {col} = $1 {taf})::numeric * 100, 1
                 ))::float8
             END as completion_percentage,
-            COALESCE((SELECT SUM(total_input_tokens)::int8 FROM sessions WHERE {col} = $1 {saf}), 0) as total_input_tokens,
-            COALESCE((SELECT SUM(total_output_tokens)::int8 FROM sessions WHERE {col} = $1 {saf}), 0) as total_output_tokens,
-            COALESCE((SELECT SUM(total_input_tokens + total_output_tokens)::int8 FROM sessions WHERE {col} = $1 {saf}), 0) as total_tokens,
+            -- Tokens are now sourced from `tasks` (where aura-os-server's
+            -- `persist_task_output` lands them on task termination), not
+            -- `sessions`. The dev-loop architecture stopped writing token
+            -- totals to `sessions.total_input_tokens` after the
+            -- task_output_cache refactor, so reading from sessions returned
+            -- 0 even for active projects. The `tasks` source matches what
+            -- the dev-loop writes today.
+            COALESCE((SELECT SUM(total_input_tokens)::int8 FROM tasks WHERE {col} = $1 {taf}), 0) as total_input_tokens,
+            COALESCE((SELECT SUM(total_output_tokens)::int8 FROM tasks WHERE {col} = $1 {taf}), 0) as total_output_tokens,
+            COALESCE((SELECT SUM(total_input_tokens + total_output_tokens)::int8 FROM tasks WHERE {col} = $1 {taf}), 0) as total_tokens,
             COALESCE((SELECT COUNT(*) FROM session_events WHERE {col} = $1 {saf}), 0) as total_events,
             COALESCE((SELECT COUNT(*) FROM project_agents WHERE {col} = $1), 0) as total_agents,
             COALESCE((SELECT COUNT(*) FROM sessions WHERE {col} = $1 {saf}), 0) as total_sessions,
@@ -232,9 +239,11 @@ async fn query_stats_unfiltered(
                     (SELECT COUNT(*) FROM tasks WHERE {col} = $1)::numeric * 100, 1
                 ))::float8
             END as completion_percentage,
-            COALESCE((SELECT SUM(total_input_tokens)::int8 FROM sessions WHERE {col} = $1), 0) as total_input_tokens,
-            COALESCE((SELECT SUM(total_output_tokens)::int8 FROM sessions WHERE {col} = $1), 0) as total_output_tokens,
-            COALESCE((SELECT SUM(total_input_tokens + total_output_tokens)::int8 FROM sessions WHERE {col} = $1), 0) as total_tokens,
+            -- Tokens sourced from `tasks` where aura-os-server's
+            -- `persist_task_output` lands them; see filtered variant above.
+            COALESCE((SELECT SUM(total_input_tokens)::int8 FROM tasks WHERE {col} = $1), 0) as total_input_tokens,
+            COALESCE((SELECT SUM(total_output_tokens)::int8 FROM tasks WHERE {col} = $1), 0) as total_output_tokens,
+            COALESCE((SELECT SUM(total_input_tokens + total_output_tokens)::int8 FROM tasks WHERE {col} = $1), 0) as total_tokens,
             COALESCE((SELECT COUNT(*) FROM session_events WHERE {col} = $1), 0) as total_events,
             COALESCE((SELECT COUNT(*) FROM project_agents WHERE {col} = $1), 0) as total_agents,
             COALESCE((SELECT COUNT(*) FROM sessions WHERE {col} = $1), 0) as total_sessions,
@@ -284,9 +293,11 @@ async fn query_network_stats(
                     (SELECT COUNT(*) FROM tasks)::numeric * 100, 1
                 ))::float8
             END as completion_percentage,
-            COALESCE((SELECT SUM(total_input_tokens)::int8 FROM sessions), 0) as total_input_tokens,
-            COALESCE((SELECT SUM(total_output_tokens)::int8 FROM sessions), 0) as total_output_tokens,
-            COALESCE((SELECT SUM(total_input_tokens + total_output_tokens)::int8 FROM sessions), 0) as total_tokens,
+            -- Tokens sourced from `tasks`; sessions tokens are not written
+            -- under the current aura-os-server architecture.
+            COALESCE((SELECT SUM(total_input_tokens)::int8 FROM tasks), 0) as total_input_tokens,
+            COALESCE((SELECT SUM(total_output_tokens)::int8 FROM tasks), 0) as total_output_tokens,
+            COALESCE((SELECT SUM(total_input_tokens + total_output_tokens)::int8 FROM tasks), 0) as total_tokens,
             COALESCE((SELECT COUNT(*) FROM session_events), 0) as total_events,
             COALESCE((SELECT COUNT(*) FROM project_agents), 0) as total_agents,
             COALESCE((SELECT COUNT(*) FROM sessions), 0) as total_sessions,

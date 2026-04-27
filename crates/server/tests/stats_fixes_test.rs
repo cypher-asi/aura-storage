@@ -307,3 +307,134 @@ async fn close_orphans_only_closes_old_active_sessions() {
     let closed = session_repo::get(&pool, closed_id).await.expect("get closed");
     assert_eq!(closed.status, "completed");
 }
+
+#[tokio::test]
+async fn stats_tokens_come_from_tasks_not_sessions() {
+    // The dashboard "Tokens" stat must reflect tokens written to
+    // `tasks.total_input_tokens` / `total_output_tokens` (where
+    // aura-os-server's `persist_task_output` lands them under the
+    // current dev-loop architecture). Tokens written to the
+    // `sessions` table must NOT contribute to this stat under the new
+    // architecture; nothing in production writes to sessions tokens
+    // today, but historical rows could remain and shouldn't double-
+    // count if this query is ever later changed.
+    use aura_storage_server::handlers::stats::{get_stats_inner, StatsQuery};
+
+    let pool = pool().await;
+    let (project_agent_id, project_id, created_by) = seed_project_agent(&pool).await;
+    let spec_id = seed_spec(&pool, project_id, created_by).await;
+
+    // Seed a session with token totals that MUST NOT show up in the
+    // stats response (these would be the historical pre-refactor data).
+    sqlx::query(
+        r#"
+        INSERT INTO sessions (id, project_agent_id, project_id, created_by, status,
+                              total_input_tokens, total_output_tokens, started_at, ended_at)
+        VALUES (gen_random_uuid(), $1, $2, $3, 'completed', 99999, 99999, NOW(), NOW())
+        "#,
+    )
+    .bind(project_agent_id)
+    .bind(project_id)
+    .bind(created_by)
+    .execute(&pool)
+    .await
+    .expect("seed session");
+
+    // Seed two completed tasks with token totals — these ARE what the
+    // stats query should sum.
+    let task_a = task_repo::create(
+        &pool,
+        project_id,
+        created_by,
+        &task_models::CreateTaskRequest {
+            org_id: None,
+            spec_id,
+            title: "task A".into(),
+            description: None,
+            order_index: 0,
+            dependency_task_ids: None,
+            parent_task_id: None,
+            assigned_project_agent_id: Some(project_agent_id),
+        },
+    )
+    .await
+    .expect("create task A");
+    sqlx::query(
+        "UPDATE tasks SET total_input_tokens = 1000, total_output_tokens = 500 WHERE id = $1",
+    )
+    .bind(task_a.id)
+    .execute(&pool)
+    .await
+    .expect("set tokens A");
+
+    let task_b = task_repo::create(
+        &pool,
+        project_id,
+        created_by,
+        &task_models::CreateTaskRequest {
+            org_id: None,
+            spec_id,
+            title: "task B".into(),
+            description: None,
+            order_index: 1,
+            dependency_task_ids: None,
+            parent_task_id: None,
+            assigned_project_agent_id: Some(project_agent_id),
+        },
+    )
+    .await
+    .expect("create task B");
+    sqlx::query(
+        "UPDATE tasks SET total_input_tokens = 200, total_output_tokens = 100 WHERE id = $1",
+    )
+    .bind(task_b.id)
+    .execute(&pool)
+    .await
+    .expect("set tokens B");
+
+    // Run the stats endpoint as the API surface does.
+    let query = StatsQuery {
+        scope: "project".into(),
+        project_id: Some(project_id),
+        org_id: None,
+        agent_id: None,
+    };
+    let response = get_stats_inner(&pool, &reqwest::Client::new(), None, None, query)
+        .await
+        .expect("stats query");
+    let stats = response.0;
+
+    // Tasks-only sum: 1000 + 200 = 1200 input, 500 + 100 = 600 output.
+    // The session row's 99999 tokens MUST be ignored.
+    assert_eq!(
+        stats.total_input_tokens, 1200,
+        "input tokens must come from tasks (1000 + 200), NOT sessions (99999)"
+    );
+    assert_eq!(
+        stats.total_output_tokens, 600,
+        "output tokens must come from tasks (500 + 100), NOT sessions (99999)"
+    );
+    assert_eq!(stats.total_tokens, 1800);
+
+    // Cleanup so this test doesn't pollute other tests' aggregations.
+    sqlx::query("DELETE FROM tasks WHERE project_id = $1")
+        .bind(project_id)
+        .execute(&pool)
+        .await
+        .expect("cleanup tasks");
+    sqlx::query("DELETE FROM sessions WHERE project_id = $1")
+        .bind(project_id)
+        .execute(&pool)
+        .await
+        .expect("cleanup sessions");
+    sqlx::query("DELETE FROM specs WHERE project_id = $1")
+        .bind(project_id)
+        .execute(&pool)
+        .await
+        .expect("cleanup specs");
+    sqlx::query("DELETE FROM project_agents WHERE project_id = $1")
+        .bind(project_id)
+        .execute(&pool)
+        .await
+        .expect("cleanup project_agents");
+}
