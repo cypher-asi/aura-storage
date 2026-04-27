@@ -23,6 +23,8 @@ pub struct Task {
     pub model: Option<String>,
     pub total_input_tokens: i64,
     pub total_output_tokens: i64,
+    pub started_at: Option<DateTime<Utc>>,
+    pub ended_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

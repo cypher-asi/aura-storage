@@ -109,10 +109,22 @@ pub async fn transition(
 
     validate_transition(&task.status, &input.status)?;
 
+    // Stamp wall-clock timestamps on first transition into in_progress / done /
+    // failed so per-task duration ("task time") is queryable. Both columns are
+    // CASE-guarded so a re-entry into the same status (or a manual overwrite)
+    // does not clobber the original timestamp.
     sqlx::query_as::<_, Task>(
         r#"
         UPDATE tasks SET
             status = $2,
+            started_at = CASE
+                WHEN $2 = 'in_progress' AND started_at IS NULL THEN NOW()
+                ELSE started_at
+            END,
+            ended_at = CASE
+                WHEN $2 IN ('done', 'failed') AND ended_at IS NULL THEN NOW()
+                ELSE ended_at
+            END,
             updated_at = NOW()
         WHERE id = $1
         RETURNING *

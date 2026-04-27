@@ -18,6 +18,10 @@ struct UsageCostResponse {
     #[allow(dead_code)]
     total_tokens: i64,
     total_cost_usd: f64,
+    /// Sum of per-call inference duration ("model time"). Optional because
+    /// older aura-network deployments do not return it.
+    #[serde(default)]
+    total_duration_ms: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -47,11 +51,20 @@ pub struct ExecutionStats {
     pub total_agents: i64,
     pub total_sessions: i64,
     pub total_time_seconds: f64,
+    /// Sum of per-task wall-clock durations (ended_at - started_at). For tasks
+    /// still in progress, ended_at is coalesced to NOW(). Distinct from
+    /// `total_time_seconds` (session-based) — both are exposed; UI chooses.
+    pub total_task_time_seconds: f64,
     pub lines_changed: i64,
     pub total_specs: i64,
     pub contributors: i64,
     #[sqlx(skip)]
     pub estimated_cost_usd: f64,
+    /// Sum of per-LLM-call inference duration, sourced from aura-network's
+    /// usage endpoint. 0.0 when aura-network is unreachable or hasn't been
+    /// updated to return `totalDurationMs` yet.
+    #[sqlx(skip)]
+    pub total_model_time_seconds: f64,
 }
 
 pub async fn get_stats(
@@ -103,7 +116,9 @@ pub async fn get_stats_inner(
         }
     };
 
-    // Fetch cost from aura-network if configured
+    // Fetch cost + model time from aura-network if configured. Both fields are
+    // best-effort: if aura-network is unreachable they stay at their zero
+    // initialization and the rest of the stats response remains valid.
     if let (Some(url), Some(token)) = (network_url, network_token) {
         if let Ok(resp) = http_client
             .get(format!("{url}{cost_path}"))
@@ -113,6 +128,9 @@ pub async fn get_stats_inner(
         {
             if let Ok(usage) = resp.json::<UsageCostResponse>().await {
                 stats.estimated_cost_usd = usage.total_cost_usd;
+                if let Some(ms) = usage.total_duration_ms {
+                    stats.total_model_time_seconds = ms as f64 / 1000.0;
+                }
             }
         }
     }
@@ -165,6 +183,7 @@ async fn query_stats(
             COALESCE((SELECT COUNT(*) FROM project_agents WHERE {col} = $1), 0) as total_agents,
             COALESCE((SELECT COUNT(*) FROM sessions WHERE {col} = $1 {saf}), 0) as total_sessions,
             COALESCE((SELECT SUM(EXTRACT(EPOCH FROM (ended_at - started_at)))::float8 FROM sessions WHERE {col} = $1 AND ended_at IS NOT NULL {saf}), 0)::float8 as total_time_seconds,
+            COALESCE((SELECT SUM(EXTRACT(EPOCH FROM (COALESCE(ended_at, NOW()) - started_at)))::float8 FROM tasks WHERE {col} = $1 AND started_at IS NOT NULL {taf}), 0)::float8 as total_task_time_seconds,
             COALESCE((
                 SELECT SUM(
                     COALESCE((elem->>'linesAdded')::bigint, 0) + COALESCE((elem->>'linesRemoved')::bigint, 0)
@@ -220,6 +239,7 @@ async fn query_stats_unfiltered(
             COALESCE((SELECT COUNT(*) FROM project_agents WHERE {col} = $1), 0) as total_agents,
             COALESCE((SELECT COUNT(*) FROM sessions WHERE {col} = $1), 0) as total_sessions,
             COALESCE((SELECT SUM(EXTRACT(EPOCH FROM (ended_at - started_at)))::float8 FROM sessions WHERE {col} = $1 AND ended_at IS NOT NULL), 0)::float8 as total_time_seconds,
+            COALESCE((SELECT SUM(EXTRACT(EPOCH FROM (COALESCE(ended_at, NOW()) - started_at)))::float8 FROM tasks WHERE {col} = $1 AND started_at IS NOT NULL), 0)::float8 as total_task_time_seconds,
             COALESCE((
                 SELECT SUM(
                     COALESCE((elem->>'linesAdded')::bigint, 0) + COALESCE((elem->>'linesRemoved')::bigint, 0)
@@ -271,6 +291,7 @@ async fn query_network_stats(
             COALESCE((SELECT COUNT(*) FROM project_agents), 0) as total_agents,
             COALESCE((SELECT COUNT(*) FROM sessions), 0) as total_sessions,
             COALESCE((SELECT SUM(EXTRACT(EPOCH FROM (ended_at - started_at)))::float8 FROM sessions WHERE ended_at IS NOT NULL), 0)::float8 as total_time_seconds,
+            COALESCE((SELECT SUM(EXTRACT(EPOCH FROM (COALESCE(ended_at, NOW()) - started_at)))::float8 FROM tasks WHERE started_at IS NOT NULL), 0)::float8 as total_task_time_seconds,
             COALESCE((
                 SELECT SUM(
                     COALESCE((elem->>'linesAdded')::bigint, 0) + COALESCE((elem->>'linesRemoved')::bigint, 0)
