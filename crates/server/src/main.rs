@@ -4,6 +4,7 @@ use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
 use aura_storage_auth::{InternalToken, TokenValidator};
+use aura_storage_server::jobs::session_cleanup;
 use aura_storage_server::router;
 use aura_storage_server::state::AppState;
 
@@ -35,6 +36,11 @@ async fn main() {
         .expect("Failed to create database pool");
 
     tracing::info!("Database connected and migrations applied");
+
+    // Periodically force-close sessions whose dev-loop disconnected without
+    // sending a close event. Without this, orphan sessions keep `status='active'`
+    // and `ended_at IS NULL` forever, contributing 0 to stats aggregation.
+    session_cleanup::spawn(pool.clone());
 
     let (events_tx, _) = tokio::sync::broadcast::channel::<String>(256);
 
