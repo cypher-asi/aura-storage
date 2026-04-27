@@ -144,6 +144,29 @@ pub async fn update_session(
     Ok(Json(session))
 }
 
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IncrementSessionTokensRequest {
+    pub input_delta: i64,
+    pub output_delta: i64,
+}
+
+/// Atomic per-call token accounting. Called by aura-router on every successful
+/// LLM round-trip so token totals persist even if the dev-loop session crashes
+/// before close. Race-free: uses SQL `total + delta` so concurrent calls
+/// cumulate correctly without read-modify-write.
+pub async fn increment_session_tokens(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(input): Json<IncrementSessionTokensRequest>,
+) -> Result<Json<session_models::Session>, AppError> {
+    let session =
+        session_repo::increment_tokens(&state.pool, id, input.input_delta, input.output_delta)
+            .await?;
+    Ok(Json(session))
+}
+
 pub async fn list_sessions(
     _auth: InternalAuth,
     State(state): State<AppState>,

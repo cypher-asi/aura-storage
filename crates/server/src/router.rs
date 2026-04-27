@@ -150,6 +150,10 @@ pub fn create_router() -> Router<AppState> {
             get(handlers::internal::get_session).put(handlers::internal::update_session),
         )
         .route(
+            "/internal/sessions/:id/tokens",
+            post(handlers::internal::increment_session_tokens),
+        )
+        .route(
             "/internal/project-agents/:projectAgentId/sessions",
             get(handlers::internal::list_sessions),
         )
