@@ -11,9 +11,9 @@ pub async fn create(
     created_by: Uuid,
     input: &CreateArtifactRequest,
 ) -> Result<Artifact, AppError> {
-    if input.artifact_type != "image" && input.artifact_type != "model" {
+    if input.artifact_type != "image" && input.artifact_type != "model" && input.artifact_type != "video" {
         return Err(AppError::BadRequest(format!(
-            "Invalid artifact type: '{}'. Must be image or model",
+            "Invalid artifact type: '{}'. Must be image, model, or video",
             input.artifact_type
         )));
     }
