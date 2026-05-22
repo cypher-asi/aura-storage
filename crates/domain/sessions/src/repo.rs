@@ -31,16 +31,68 @@ pub async fn create(
     Ok(session)
 }
 
+/// List sessions belonging to a project-agent.
+///
+/// `include_empty` controls whether orphan zero-event sessions are
+/// returned — the chat-app session list always wants `false` (empty
+/// rows render as un-clickable "New chat" rows in the sidekick), and
+/// the partial index `idx_sessions_pa_recent` is a covering match for
+/// that path so the filter is essentially free. Diagnostics tooling
+/// can pass `true` to inspect the full table.
+///
+/// Ordering: most-recently-active first. `last_event_at` is the
+/// timestamp of the most recent row in `session_events` for the
+/// session, maintained by the `session_events_after_insert` trigger
+/// (see migration 0014). It can be `NULL` when `include_empty=true`
+/// for sessions that genuinely have no events; we sort `NULLS LAST`
+/// and tiebreak on `started_at` so the ordering stays stable.
 pub async fn list_by_project_agent(
     pool: &PgPool,
     project_agent_id: Uuid,
+    include_empty: bool,
 ) -> Result<Vec<Session>, AppError> {
-    let sessions = sqlx::query_as::<_, Session>(
-        "SELECT * FROM sessions WHERE project_agent_id = $1 ORDER BY started_at DESC",
-    )
-    .bind(project_agent_id)
-    .fetch_all(pool)
-    .await?;
+    let sql = if include_empty {
+        "SELECT * FROM sessions
+         WHERE project_agent_id = $1
+         ORDER BY last_event_at DESC NULLS LAST, started_at DESC"
+    } else {
+        "SELECT * FROM sessions
+         WHERE project_agent_id = $1 AND event_count > 0
+         ORDER BY last_event_at DESC NULLS LAST, started_at DESC"
+    };
+
+    let sessions = sqlx::query_as::<_, Session>(sql)
+        .bind(project_agent_id)
+        .fetch_all(pool)
+        .await?;
+
+    Ok(sessions)
+}
+
+/// Project-scoped session listing across every project-agent on the
+/// project. Replaces the per-agent fan-out aura-os-server used to do:
+/// it iterated `list_project_agents` and called
+/// `list_by_project_agent` for each, sequentially. This is one
+/// indexed query against `idx_sessions_project_recent`.
+pub async fn list_by_project(
+    pool: &PgPool,
+    project_id: Uuid,
+    include_empty: bool,
+) -> Result<Vec<Session>, AppError> {
+    let sql = if include_empty {
+        "SELECT * FROM sessions
+         WHERE project_id = $1
+         ORDER BY last_event_at DESC NULLS LAST, started_at DESC"
+    } else {
+        "SELECT * FROM sessions
+         WHERE project_id = $1 AND event_count > 0
+         ORDER BY last_event_at DESC NULLS LAST, started_at DESC"
+    };
+
+    let sessions = sqlx::query_as::<_, Session>(sql)
+        .bind(project_id)
+        .fetch_all(pool)
+        .await?;
 
     Ok(sessions)
 }

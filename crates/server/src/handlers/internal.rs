@@ -167,12 +167,32 @@ pub async fn increment_session_tokens(
     Ok(Json(session))
 }
 
+#[derive(Debug, serde::Deserialize, Default)]
+pub struct InternalSessionListQuery {
+    #[serde(default)]
+    pub include_empty: bool,
+}
+
 pub async fn list_sessions(
     _auth: InternalAuth,
     State(state): State<AppState>,
     Path(project_agent_id): Path<Uuid>,
+    Query(query): Query<InternalSessionListQuery>,
 ) -> Result<Json<Vec<session_models::Session>>, AppError> {
-    let sessions = session_repo::list_by_project_agent(&state.pool, project_agent_id).await?;
+    let sessions =
+        session_repo::list_by_project_agent(&state.pool, project_agent_id, query.include_empty)
+            .await?;
+    Ok(Json(sessions))
+}
+
+pub async fn list_project_sessions(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Path(project_id): Path<Uuid>,
+    Query(query): Query<InternalSessionListQuery>,
+) -> Result<Json<Vec<session_models::Session>>, AppError> {
+    let sessions =
+        session_repo::list_by_project(&state.pool, project_id, query.include_empty).await?;
     Ok(Json(sessions))
 }
 

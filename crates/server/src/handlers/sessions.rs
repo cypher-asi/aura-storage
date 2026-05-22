@@ -1,5 +1,6 @@
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::Json;
+use serde::Deserialize;
 use uuid::Uuid;
 
 use aura_storage_auth::AuthUser;
@@ -7,6 +8,18 @@ use aura_storage_core::AppError;
 use aura_storage_sessions::{models, repo};
 
 use crate::state::AppState;
+
+/// Query string for the session list endpoints. `include_empty=true`
+/// returns sessions with `event_count = 0` (orphan rows from races on
+/// session creation, plus pre-`lazy-+` legacy data); the default
+/// `false` is what the chat-app session list wants — every row in the
+/// response is guaranteed to land in a transcript with at least one
+/// user message.
+#[derive(Debug, Deserialize, Default)]
+pub struct SessionListQuery {
+    #[serde(default)]
+    pub include_empty: bool,
+}
 
 pub async fn create_session(
     auth: AuthUser,
@@ -38,8 +51,20 @@ pub async fn list_sessions(
     _auth: AuthUser,
     State(state): State<AppState>,
     Path(project_agent_id): Path<Uuid>,
+    Query(query): Query<SessionListQuery>,
 ) -> Result<Json<Vec<models::Session>>, AppError> {
-    let sessions = repo::list_by_project_agent(&state.pool, project_agent_id).await?;
+    let sessions =
+        repo::list_by_project_agent(&state.pool, project_agent_id, query.include_empty).await?;
+    Ok(Json(sessions))
+}
+
+pub async fn list_project_sessions(
+    _auth: AuthUser,
+    State(state): State<AppState>,
+    Path(project_id): Path<Uuid>,
+    Query(query): Query<SessionListQuery>,
+) -> Result<Json<Vec<models::Session>>, AppError> {
+    let sessions = repo::list_by_project(&state.pool, project_id, query.include_empty).await?;
     Ok(Json(sessions))
 }
 
