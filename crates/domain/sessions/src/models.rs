@@ -31,6 +31,37 @@ pub struct Session {
     pub last_event_at: Option<DateTime<Utc>>,
 }
 
+/// `Session` joined with the agent metadata the chat-app left
+/// panel needs to render a row (agent avatar resolution + stream
+/// lane keying) without a follow-up `listProjectBindings` fan-out
+/// per agent. Returned by the user-scoped session list endpoint
+/// (`/api/me/sessions`, see migration 0015) which collapses what
+/// used to be `A x (1 + B)` HTTP calls from the chat-app left
+/// panel down to one.
+///
+/// Notes on absent fields:
+/// - There is no `agent_name` on `project_agents` (see
+///   `crates/db/migrations/0001_create_project_agents.sql`); the
+///   FE resolves agent names from its existing per-agent caches.
+/// - There is no `projects` table in aura-storage; project
+///   metadata lives in aura-os and is resolved client-side from
+///   `useProjectsListStore`. We deliberately omit a stub
+///   `project_name` field rather than wire a column that would
+///   always be `NULL`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnrichedSession {
+    #[serde(flatten)]
+    pub session: Session,
+    /// `project_agents.agent_id` -- the agent identifier the FE
+    /// keys avatars and stream lanes by. Distinct from
+    /// `Session.project_agent_id` (which is the per-project
+    /// instance binding row id, not the agent definition). May be
+    /// `None` if the binding row was deleted or migrated away from
+    /// underneath the session.
+    pub agent_id: Option<Uuid>,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateSessionRequest {

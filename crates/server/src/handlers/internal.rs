@@ -196,6 +196,21 @@ pub async fn list_project_sessions(
     Ok(Json(sessions))
 }
 
+/// Internal counterpart to public `list_my_sessions`. Takes
+/// `:userId` on the path because internal callers run under
+/// `X-Internal-Token` rather than a per-user JWT and so must
+/// declare which user to scope to. Same backing query and same
+/// `idx_sessions_user_recent` index hit (migration 0015).
+pub async fn list_user_sessions(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Path(user_id): Path<Uuid>,
+    Query(query): Query<InternalSessionListQuery>,
+) -> Result<Json<Vec<session_models::EnrichedSession>>, AppError> {
+    let sessions = session_repo::list_by_user(&state.pool, user_id, query.include_empty).await?;
+    Ok(Json(sessions))
+}
+
 // ============================================================================
 // Events
 // ============================================================================

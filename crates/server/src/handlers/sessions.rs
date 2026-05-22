@@ -68,6 +68,27 @@ pub async fn list_project_sessions(
     Ok(Json(sessions))
 }
 
+/// Cross-agent user-scoped session list. Powers the chat-app left
+/// panel which used to fan out across every agent the user owns
+/// (see `apps/chat-app/components/ChatAppLeftPanel/ChatAppLeftPanel.tsx`
+/// in aura-os pre-this-commit). The user_id is derived from the
+/// JWT -- there is no `:userId` path param on the public endpoint
+/// so callers cannot peek at other users' sessions. Internal
+/// callers that need to scope by an arbitrary user_id should use
+/// `/internal/users/:userId/sessions` instead.
+pub async fn list_my_sessions(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Query(query): Query<SessionListQuery>,
+) -> Result<Json<Vec<models::EnrichedSession>>, AppError> {
+    let user_id = auth
+        .user_id
+        .parse::<Uuid>()
+        .map_err(|_| AppError::BadRequest("Invalid user ID".into()))?;
+    let sessions = repo::list_by_user(&state.pool, user_id, query.include_empty).await?;
+    Ok(Json(sessions))
+}
+
 pub async fn get_session(
     _auth: AuthUser,
     State(state): State<AppState>,
