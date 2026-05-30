@@ -11,7 +11,7 @@
 -- left-panel default path (include_empty=false) never has to
 -- visit them. The (created_by, last_event_at DESC NULLS LAST,
 -- started_at DESC) shape mirrors idx_sessions_pa_recent and
--- idx_sessions_project_recent from migration 0014 so the same
+-- idx_sessions_project_recent from migration 0015 so the same
 -- ORDER BY plan is reused.
 CREATE INDEX idx_sessions_user_recent
     ON sessions (created_by, last_event_at DESC NULLS LAST, started_at DESC)

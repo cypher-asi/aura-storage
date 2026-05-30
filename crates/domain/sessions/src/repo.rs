@@ -43,7 +43,7 @@ pub async fn create(
 /// Ordering: most-recently-active first. `last_event_at` is the
 /// timestamp of the most recent row in `session_events` for the
 /// session, maintained by the `session_events_after_insert` trigger
-/// (see migration 0014). It can be `NULL` when `include_empty=true`
+/// (see migration 0015). It can be `NULL` when `include_empty=true`
 /// for sessions that genuinely have no events; we sort `NULLS LAST`
 /// and tiebreak on `started_at` so the ordering stays stable.
 pub async fn list_by_project_agent(
@@ -103,7 +103,7 @@ pub async fn list_by_project(
 /// which used to fan out one /api/projects/:p/agents/:a/sessions
 /// call per (agent, project_binding) pair on first paint. This is
 /// a single indexed query against `idx_sessions_user_recent` (see
-/// migration 0015), so the panel's first paint is now O(1) HTTP
+/// migration 0016), so the panel's first paint is now O(1) HTTP
 /// calls instead of O(A x B).
 ///
 /// `LEFT JOIN project_agents` mirrors `list_project_agents`'

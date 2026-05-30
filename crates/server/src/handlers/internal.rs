@@ -200,7 +200,7 @@ pub async fn list_project_sessions(
 /// `:userId` on the path because internal callers run under
 /// `X-Internal-Token` rather than a per-user JWT and so must
 /// declare which user to scope to. Same backing query and same
-/// `idx_sessions_user_recent` index hit (migration 0015).
+/// `idx_sessions_user_recent` index hit (migration 0016).
 pub async fn list_user_sessions(
     _auth: InternalAuth,
     State(state): State<AppState>,

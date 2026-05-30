@@ -22,7 +22,7 @@ pub struct Session {
     /// `session_events`. Lets the chat-app session list filter empty
     /// orphan rows in a single indexed `WHERE event_count > 0` instead
     /// of fanning out one `list_events?limit=1` probe per session from
-    /// aura-os-server (see migration 0014).
+    /// aura-os-server (see migration 0015).
     pub event_count: i32,
     /// Timestamp of the most recent `session_events` row for this
     /// session. Used as the primary sort key on the chat-app session
@@ -35,7 +35,7 @@ pub struct Session {
 /// panel needs to render a row (agent avatar resolution + stream
 /// lane keying) without a follow-up `listProjectBindings` fan-out
 /// per agent. Returned by the user-scoped session list endpoint
-/// (`/api/me/sessions`, see migration 0015) which collapses what
+/// (`/api/me/sessions`, see migration 0016) which collapses what
 /// used to be `A x (1 + B)` HTTP calls from the chat-app left
 /// panel down to one.
 ///
