@@ -145,6 +145,8 @@ pub async fn list_by_user(
              s.ended_at            AS s_ended_at,
              s.event_count         AS s_event_count,
              s.last_event_at       AS s_last_event_at,
+             s.is_public           AS s_is_public,
+             s.public_share_id     AS s_public_share_id,
              pa.agent_id           AS pa_agent_id
          FROM sessions s
          LEFT JOIN project_agents pa ON pa.id = s.project_agent_id
@@ -167,6 +169,8 @@ pub async fn list_by_user(
              s.ended_at            AS s_ended_at,
              s.event_count         AS s_event_count,
              s.last_event_at       AS s_last_event_at,
+             s.is_public           AS s_is_public,
+             s.public_share_id     AS s_public_share_id,
              pa.agent_id           AS pa_agent_id
          FROM sessions s
          LEFT JOIN project_agents pa ON pa.id = s.project_agent_id
@@ -199,6 +203,8 @@ struct EnrichedSessionRow {
     s_ended_at: Option<chrono::DateTime<chrono::Utc>>,
     s_event_count: i32,
     s_last_event_at: Option<chrono::DateTime<chrono::Utc>>,
+    s_is_public: bool,
+    s_public_share_id: Option<String>,
     pa_agent_id: Option<Uuid>,
 }
 
@@ -221,6 +227,8 @@ impl EnrichedSessionRow {
                 ended_at: self.s_ended_at,
                 event_count: self.s_event_count,
                 last_event_at: self.s_last_event_at,
+                is_public: self.s_is_public,
+                public_share_id: self.s_public_share_id,
             },
             agent_id: self.pa_agent_id,
         }
@@ -258,7 +266,9 @@ pub async fn update(
             total_output_tokens = COALESCE($4, total_output_tokens),
             context_usage = COALESCE($5, context_usage),
             summary = COALESCE($6, summary),
-            ended_at = COALESCE($7, ended_at)
+            ended_at = COALESCE($7, ended_at),
+            is_public = COALESCE($8, is_public),
+            public_share_id = COALESCE($9, public_share_id)
         WHERE id = $1
         RETURNING *
         "#,
@@ -270,9 +280,31 @@ pub async fn update(
     .bind(input.context_usage)
     .bind(&input.summary)
     .bind(input.ended_at)
+    .bind(input.is_public)
+    .bind(&input.public_share_id)
     .fetch_optional(pool)
     .await?
     .ok_or_else(|| AppError::NotFound("Session not found".into()))
+}
+
+/// Look up a session by its opaque public share token.
+///
+/// `public_share_id` is the `t_`-prefixed capability token set when a
+/// session is shared (see `UpdateSessionRequest::public_share_id`). The
+/// partial unique index `idx_sessions_public_share_id` (migration 0017)
+/// makes this an indexed point lookup. Callers MUST validate the token
+/// shape at the boundary before calling this. Returns
+/// `AppError::NotFound` when no session carries the token.
+///
+/// Note this does NOT itself gate on `is_public`; the public read path
+/// is responsible for rejecting sessions whose flag has been turned off
+/// after a token was issued.
+pub async fn get_by_share(pool: &PgPool, public_share_id: &str) -> Result<Session, AppError> {
+    sqlx::query_as::<_, Session>("SELECT * FROM sessions WHERE public_share_id = $1")
+        .bind(public_share_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Session not found".into()))
 }
 
 /// Atomically add token deltas to a session's running totals.

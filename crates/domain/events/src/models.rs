@@ -44,7 +44,7 @@ pub struct EventListQuery {
 
 impl EventListQuery {
     pub fn limit(&self) -> i64 {
-        self.limit.unwrap_or(100).min(500).max(1)
+        self.limit.unwrap_or(100).clamp(1, 500)
     }
 
     pub fn offset(&self) -> i64 {

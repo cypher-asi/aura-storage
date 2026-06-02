@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct Session {
     pub id: Uuid,
@@ -29,6 +29,21 @@ pub struct Session {
     /// list so the most recently-active sessions float to the top
     /// regardless of when the row was first created.
     pub last_event_at: Option<DateTime<Utc>>,
+    /// Whether this session is publicly shareable. Flipped to `true`
+    /// when an owner creates a share link and back to `false` on
+    /// unshare. The public read path gates on this flag so an
+    /// `public_share_id` alone never exposes a private session.
+    /// `#[serde(default)]` keeps older payloads (pre-migration 0017)
+    /// deserializable.
+    #[serde(default)]
+    pub is_public: bool,
+    /// Opaque capability token for the public share link, formatted as
+    /// `t_` + 32 lowercase hex chars (a v4 UUID with dashes stripped),
+    /// e.g. `t_6a1e3d8f6e548191948c1f0a9c68cbda`. `None` until the
+    /// session is first shared. Treated as a secret: never log it in
+    /// full. Backed by a partial unique index (migration 0017).
+    #[serde(default)]
+    pub public_share_id: Option<String>,
 }
 
 /// `Session` joined with the agent metadata the chat-app left
@@ -79,4 +94,87 @@ pub struct UpdateSessionRequest {
     pub context_usage: Option<f32>,
     pub summary: Option<String>,
     pub ended_at: Option<DateTime<Utc>>,
+    /// Set the public-share flag. `None` leaves it unchanged (the repo
+    /// `update` uses `COALESCE`), `Some(true)`/`Some(false)` share or
+    /// unshare the session.
+    pub is_public: Option<bool>,
+    /// Set the public share token (`t_` + 32 lowercase hex chars).
+    /// `None` leaves the existing value unchanged. Capability token:
+    /// callers must not log it in full.
+    pub public_share_id: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_session() -> Session {
+        Session {
+            id: Uuid::nil(),
+            project_agent_id: Uuid::nil(),
+            project_id: Uuid::nil(),
+            org_id: None,
+            created_by: Uuid::nil(),
+            model: Some("gpt-test".to_string()),
+            status: "active".to_string(),
+            total_input_tokens: 10,
+            total_output_tokens: 20,
+            context_usage: 0.5,
+            summary: None,
+            started_at: DateTime::<Utc>::from_timestamp(0, 0).expect("valid epoch timestamp"),
+            ended_at: None,
+            event_count: 3,
+            last_event_at: None,
+            is_public: true,
+            public_share_id: Some("t_6a1e3d8f6e548191948c1f0a9c68cbda".to_string()),
+        }
+    }
+
+    #[test]
+    fn session_serde_round_trip_preserves_share_fields() {
+        let session = sample_session();
+
+        let json = serde_json::to_value(&session).expect("session serializes to JSON");
+        // Fields are camelCased on the wire.
+        assert_eq!(json["isPublic"], serde_json::json!(true));
+        assert_eq!(
+            json["publicShareId"],
+            serde_json::json!("t_6a1e3d8f6e548191948c1f0a9c68cbda")
+        );
+
+        let decoded: Session =
+            serde_json::from_value(json).expect("session deserializes back from JSON");
+        assert_eq!(decoded.is_public, session.is_public);
+        assert_eq!(decoded.public_share_id, session.public_share_id);
+        assert_eq!(decoded.id, session.id);
+        assert_eq!(decoded.status, session.status);
+    }
+
+    #[test]
+    fn session_defaults_share_fields_when_absent() {
+        // A payload produced before migration 0017 omits the share
+        // fields entirely; `#[serde(default)]` must fill them in.
+        let legacy = serde_json::json!({
+            "id": Uuid::nil(),
+            "projectAgentId": Uuid::nil(),
+            "projectId": Uuid::nil(),
+            "orgId": null,
+            "createdBy": Uuid::nil(),
+            "model": null,
+            "status": "active",
+            "totalInputTokens": 0,
+            "totalOutputTokens": 0,
+            "contextUsage": 0.0,
+            "summary": null,
+            "startedAt": "1970-01-01T00:00:00Z",
+            "endedAt": null,
+            "eventCount": 0,
+            "lastEventAt": null
+        });
+
+        let decoded: Session =
+            serde_json::from_value(legacy).expect("legacy session payload deserializes");
+        assert!(!decoded.is_public);
+        assert_eq!(decoded.public_share_id, None);
+    }
 }

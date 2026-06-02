@@ -162,6 +162,10 @@ pub fn create_router() -> Router<AppState> {
             post(handlers::internal::increment_session_tokens),
         )
         .route(
+            "/internal/sessions/by-share/:token",
+            get(handlers::internal::get_session_by_share),
+        )
+        .route(
             "/internal/project-agents/:projectAgentId/sessions",
             get(handlers::internal::list_sessions),
         )

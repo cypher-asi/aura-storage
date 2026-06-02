@@ -38,7 +38,7 @@ async fn handle_ws(mut socket: WebSocket, mut rx: broadcast::Receiver<String>) {
             msg = rx.recv() => {
                 match msg {
                     Ok(event) => {
-                        if socket.send(Message::Text(event.into())).await.is_err() {
+                        if socket.send(Message::Text(event)).await.is_err() {
                             break;
                         }
                     }
@@ -49,7 +49,7 @@ async fn handle_ws(mut socket: WebSocket, mut rx: broadcast::Receiver<String>) {
                 }
             }
             _ = ping_interval.tick() => {
-                if socket.send(Message::Ping(vec![].into())).await.is_err() {
+                if socket.send(Message::Ping(vec![])).await.is_err() {
                     break;
                 }
             }

@@ -120,6 +120,45 @@ pub async fn get_session(
     Ok(Json(session))
 }
 
+/// Validate a public share token's shape (`^t_[0-9a-f]{32}$`).
+///
+/// The token is a `t_` prefix followed by 32 lowercase hex chars (a v4
+/// UUID with dashes stripped). We check the shape before touching the
+/// database so malformed input is rejected at the boundary and never
+/// reaches the SQL `WHERE public_share_id = $1` lookup.
+fn is_valid_share_token(token: &str) -> bool {
+    let Some(hex) = token.strip_prefix("t_") else {
+        return false;
+    };
+    hex.len() == 32
+        && hex
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+/// Look up a session by its opaque public share token.
+///
+/// The token is taken as a `String` (not a `Uuid`) because it is a
+/// `t_`-prefixed capability token, not a session id. The shape is
+/// validated before the lookup; an invalid token is a `BadRequest` and
+/// an unknown-but-valid token is a `NotFound`, mirroring the other
+/// session handlers. The token is a secret, so only a short prefix is
+/// ever logged.
+pub async fn get_session_by_share(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+) -> Result<Json<session_models::Session>, AppError> {
+    if !is_valid_share_token(&token) {
+        let prefix: String = token.chars().take(2).collect();
+        tracing::warn!(token_prefix = %prefix, "rejected malformed public share token");
+        return Err(AppError::BadRequest("Invalid share token".into()));
+    }
+
+    let session = session_repo::get_by_share(&state.pool, &token).await?;
+    Ok(Json(session))
+}
+
 pub async fn update_session(
     _auth: InternalAuth,
     State(state): State<AppState>,
@@ -262,7 +301,7 @@ pub async fn list_logs(
     Path(project_id): Path<Uuid>,
     Query(query): Query<LogListQuery>,
 ) -> Result<Json<Vec<log_models::LogEntry>>, AppError> {
-    let limit = query.limit.unwrap_or(100).min(500).max(1);
+    let limit = query.limit.unwrap_or(100).clamp(1, 500);
     let offset = query.offset.unwrap_or(0).max(0);
     let entries = log_repo::list_by_project(
         &state.pool,
