@@ -99,11 +99,13 @@ pub async fn get_session(
 }
 
 pub async fn update_session(
-    _auth: AuthUser,
+    auth: AuthUser,
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     Json(input): Json<models::UpdateSessionRequest>,
 ) -> Result<Json<models::Session>, AppError> {
+    require_share_update_owner(&state, &auth, id, &input).await?;
+
     let session = repo::update(&state.pool, id, &input).await?;
 
     if input.status.is_some() {
@@ -120,4 +122,29 @@ pub async fn update_session(
     }
 
     Ok(Json(session))
+}
+
+async fn require_share_update_owner(
+    state: &AppState,
+    auth: &AuthUser,
+    session_id: Uuid,
+    input: &models::UpdateSessionRequest,
+) -> Result<(), AppError> {
+    if input.is_public.is_none() && input.public_share_id.is_none() {
+        return Ok(());
+    }
+
+    let user_id = auth
+        .user_id
+        .parse::<Uuid>()
+        .map_err(|_| AppError::BadRequest("Invalid user ID".into()))?;
+    let session = repo::get(&state.pool, session_id).await?;
+
+    if session.created_by != user_id {
+        return Err(AppError::Forbidden(
+            "Only the session owner can update share settings".into(),
+        ));
+    }
+
+    Ok(())
 }

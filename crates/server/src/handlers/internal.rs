@@ -120,22 +120,6 @@ pub async fn get_session(
     Ok(Json(session))
 }
 
-/// Validate a public share token's shape (`^t_[0-9a-f]{32}$`).
-///
-/// The token is a `t_` prefix followed by 32 lowercase hex chars (a v4
-/// UUID with dashes stripped). We check the shape before touching the
-/// database so malformed input is rejected at the boundary and never
-/// reaches the SQL `WHERE public_share_id = $1` lookup.
-fn is_valid_share_token(token: &str) -> bool {
-    let Some(hex) = token.strip_prefix("t_") else {
-        return false;
-    };
-    hex.len() == 32
-        && hex
-            .bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-}
-
 /// Look up a session by its opaque public share token.
 ///
 /// The token is taken as a `String` (not a `Uuid`) because it is a
@@ -149,7 +133,7 @@ pub async fn get_session_by_share(
     State(state): State<AppState>,
     Path(token): Path<String>,
 ) -> Result<Json<session_models::Session>, AppError> {
-    if !is_valid_share_token(&token) {
+    if !session_models::is_valid_public_share_id(&token) {
         let prefix: String = token.chars().take(2).collect();
         tracing::warn!(token_prefix = %prefix, "rejected malformed public share token");
         return Err(AppError::BadRequest("Invalid share token".into()));

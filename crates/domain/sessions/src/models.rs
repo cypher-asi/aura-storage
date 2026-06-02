@@ -104,6 +104,20 @@ pub struct UpdateSessionRequest {
     pub public_share_id: Option<String>,
 }
 
+/// Validate a public share token's shape (`^t_[0-9a-f]{32}$`).
+///
+/// Share ids are capability tokens, so validation is centralized here
+/// and callers should avoid logging the raw value.
+pub fn is_valid_public_share_id(token: &str) -> bool {
+    let Some(hex) = token.strip_prefix("t_") else {
+        return false;
+    };
+    hex.len() == 32
+        && hex
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,5 +190,20 @@ mod tests {
             serde_json::from_value(legacy).expect("legacy session payload deserializes");
         assert!(!decoded.is_public);
         assert_eq!(decoded.public_share_id, None);
+    }
+
+    #[test]
+    fn validates_public_share_id_shape() {
+        assert!(is_valid_public_share_id(
+            "t_6a1e3d8f6e548191948c1f0a9c68cbda"
+        ));
+        assert!(!is_valid_public_share_id(
+            "6a1e3d8f-6e54-4191-948c-1f0a9c68cbda"
+        ));
+        assert!(!is_valid_public_share_id(
+            "t_6A1e3d8f6e548191948c1f0a9c68cbda"
+        ));
+        assert!(!is_valid_public_share_id("t_6a1e3d8f"));
+        assert!(!is_valid_public_share_id(""));
     }
 }

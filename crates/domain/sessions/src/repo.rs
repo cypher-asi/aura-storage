@@ -3,7 +3,9 @@ use uuid::Uuid;
 
 use aura_storage_core::AppError;
 
-use crate::models::{CreateSessionRequest, EnrichedSession, Session, UpdateSessionRequest};
+use crate::models::{
+    is_valid_public_share_id, CreateSessionRequest, EnrichedSession, Session, UpdateSessionRequest,
+};
 
 const VALID_STATUSES: &[&str] = &["active", "completed", "failed", "rolled_over"];
 
@@ -183,7 +185,10 @@ pub async fn list_by_user(
         .fetch_all(pool)
         .await?;
 
-    Ok(rows.into_iter().map(EnrichedSessionRow::into_enriched).collect())
+    Ok(rows
+        .into_iter()
+        .map(EnrichedSessionRow::into_enriched)
+        .collect())
 }
 
 #[derive(sqlx::FromRow)]
@@ -255,6 +260,12 @@ pub async fn update(
                 status,
                 VALID_STATUSES.join(", ")
             )));
+        }
+    }
+
+    if let Some(ref public_share_id) = input.public_share_id {
+        if !is_valid_public_share_id(public_share_id) {
+            return Err(AppError::BadRequest("Invalid public share id".into()));
         }
     }
 
