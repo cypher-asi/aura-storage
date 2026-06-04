@@ -842,6 +842,257 @@ Delete an artifact.
 
 ---
 
+## Notes
+
+Notes, note folders, and note comments. Blog posts are notes with the extra blog fields populated and a `draft`/`published` lifecycle. Note **bodies** are stored on S3 by another service — aura-storage only stores metadata plus an S3 reference (`bodyUrl`, `bodyS3Key`).
+
+### POST /api/projects/:projectId/notes
+
+Create a note.
+
+**Auth:** JWT
+
+**Path params:** `projectId` (UUID)
+
+**Request body:**
+
+```json
+{
+  "orgId": "uuid (optional)",
+  "folderId": "uuid (optional — parent folder)",
+  "title": "string (required)",
+  "slug": "string (required)",
+  "sortOrder": "integer (default: 0)",
+  "wordCount": "integer (default: 0)",
+  "bodyUrl": "string (optional — S3 URL of the body)",
+  "bodyS3Key": "string (optional — S3 object key of the body)",
+  "blogType": "string (optional)",
+  "excerpt": "string (optional)",
+  "heroImageUrl": "string (optional)",
+  "readTimeMinutes": "integer (optional)",
+  "authorId": "uuid (optional)",
+  "authorName": "string (optional)",
+  "authorAvatarUrl": "string (optional)",
+  "sections": "{} (optional — freeform JSONB)"
+}
+```
+
+**Response:** `200` — Note
+
+```json
+{
+  "id": "uuid",
+  "projectId": "uuid",
+  "orgId": "uuid | null",
+  "folderId": "uuid | null",
+  "title": "string",
+  "slug": "string",
+  "sortOrder": 0,
+  "wordCount": 0,
+  "bodyUrl": "string | null",
+  "bodyS3Key": "string | null",
+  "status": "draft | published",
+  "blogType": "string | null",
+  "excerpt": "string | null",
+  "heroImageUrl": "string | null",
+  "readTimeMinutes": "integer | null",
+  "publishedAt": "datetime | null",
+  "authorId": "uuid | null",
+  "authorName": "string | null",
+  "authorAvatarUrl": "string | null",
+  "sections": "{} | null",
+  "createdBy": "uuid",
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+```
+
+New notes default to `status: "draft"` with `publishedAt: null`.
+
+---
+
+### GET /api/projects/:projectId/notes
+
+List all notes for a project, ordered by `sortOrder`, then `createdAt` DESC.
+
+**Auth:** JWT
+
+**Path params:** `projectId` (UUID)
+
+**Response:** `200` — Array of Note objects.
+
+---
+
+### GET /api/notes/:id
+
+Get a single note by ID.
+
+**Auth:** JWT
+
+**Response:** `200` — Note
+
+---
+
+### PUT /api/notes/:id
+
+Update a note. All fields are optional. Does **not** change `status` (use the transition endpoint instead).
+
+**Auth:** JWT
+
+**Request body:** Any subset of `folderId`, `title`, `slug`, `sortOrder`, `wordCount`, `bodyUrl`, `bodyS3Key`, `blogType`, `excerpt`, `heroImageUrl`, `readTimeMinutes`, `authorId`, `authorName`, `authorAvatarUrl`, `sections`.
+
+**Response:** `200` — Note
+
+---
+
+### POST /api/notes/:id/transition
+
+Transition a note's lifecycle status.
+
+**Auth:** JWT
+
+**Request body:**
+
+```json
+{
+  "status": "published"
+}
+```
+
+`status` must be `draft` or `published`. Moving to `published` stamps `publishedAt = NOW()`; moving back to `draft` clears `publishedAt`.
+
+**Response:** `200` — Note
+
+**Side Effect:** Broadcasts `note.status_changed` via WebSocket.
+
+---
+
+### DELETE /api/notes/:id
+
+Delete a note.
+
+**Auth:** JWT
+
+**Response:** `204 No Content`
+
+---
+
+### GET /api/projects/:projectId/note-folders
+
+List note folders for a project, ordered by `sortOrder`, then `name`.
+
+**Auth:** JWT
+
+**Response:** `200` — Array of NoteFolder objects.
+
+```json
+{
+  "id": "uuid",
+  "projectId": "uuid",
+  "orgId": "uuid | null",
+  "parentId": "uuid | null",
+  "name": "string",
+  "sortOrder": 0,
+  "createdBy": "uuid",
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+```
+
+---
+
+### POST /api/projects/:projectId/note-folders
+
+Create a note folder. Folders form a tree via the self-referencing `parentId`.
+
+**Auth:** JWT
+
+**Request body:**
+
+```json
+{
+  "orgId": "uuid (optional)",
+  "parentId": "uuid (optional — parent folder)",
+  "name": "string (required)",
+  "sortOrder": "integer (default: 0)"
+}
+```
+
+**Response:** `200` — NoteFolder
+
+---
+
+### PUT /api/note-folders/:id
+
+Update a note folder. All fields optional (`parentId`, `name`, `sortOrder`).
+
+**Auth:** JWT
+
+**Response:** `200` — NoteFolder
+
+---
+
+### DELETE /api/note-folders/:id
+
+Delete a note folder.
+
+**Auth:** JWT
+
+**Response:** `204 No Content`
+
+---
+
+### GET /api/notes/:id/comments
+
+List comments for a note, ordered by `createdAt` ASC.
+
+**Auth:** JWT
+
+**Response:** `200` — Array of NoteComment objects.
+
+```json
+{
+  "id": "uuid",
+  "noteId": "uuid",
+  "authorId": "uuid | null",
+  "authorName": "string | null",
+  "body": "string",
+  "createdAt": "datetime"
+}
+```
+
+---
+
+### POST /api/notes/:id/comments
+
+Create a comment on a note.
+
+**Auth:** JWT
+
+**Request body:**
+
+```json
+{
+  "authorId": "uuid (optional)",
+  "authorName": "string (optional)",
+  "body": "string (required)"
+}
+```
+
+**Response:** `200` — NoteComment
+
+---
+
+### DELETE /api/note-comments/:id
+
+Delete a note comment.
+
+**Auth:** JWT
+
+**Response:** `204 No Content`
+
+---
+
 ## Stats
 
 ### GET /api/stats
@@ -2097,6 +2348,24 @@ Get an artifact.
 Delete an artifact.
 
 **Auth:** Internal
+
+---
+
+### Notes
+
+#### GET /internal/projects/:projectId/published-notes
+
+List published notes for a project, ordered by `publishedAt` DESC. Used by the public-facing blog service to render published posts without a per-user JWT.
+
+**Auth:** Internal
+
+**Path Parameters:**
+
+| Parameter   | Type | Required | Description        |
+|-------------|------|----------|--------------------|
+| `projectId` | UUID | Yes      | The project's UUID |
+
+**Response:** `200` — Array of Note objects (only `status: "published"`, ordered by `publishedAt` DESC).
 
 ---
 

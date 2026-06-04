@@ -80,6 +80,37 @@ pub fn create_router() -> Router<AppState> {
             "/api/artifacts/:id/children",
             get(handlers::artifacts::get_artifact_children),
         )
+        // Notes
+        .route(
+            "/api/projects/:projectId/notes",
+            post(handlers::notes::create_note).get(handlers::notes::list_notes),
+        )
+        .route(
+            "/api/notes/:id",
+            get(handlers::notes::get_note)
+                .put(handlers::notes::update_note)
+                .delete(handlers::notes::delete_note),
+        )
+        .route(
+            "/api/notes/:id/transition",
+            post(handlers::notes::transition_note),
+        )
+        .route(
+            "/api/projects/:projectId/note-folders",
+            post(handlers::notes::create_note_folder).get(handlers::notes::list_note_folders),
+        )
+        .route(
+            "/api/note-folders/:id",
+            put(handlers::notes::update_note_folder).delete(handlers::notes::delete_note_folder),
+        )
+        .route(
+            "/api/notes/:id/comments",
+            post(handlers::notes::create_note_comment).get(handlers::notes::list_note_comments),
+        )
+        .route(
+            "/api/note-comments/:id",
+            delete(handlers::notes::delete_note_comment),
+        )
         // Processes
         .route(
             "/api/processes",
@@ -253,6 +284,11 @@ pub fn create_router() -> Router<AppState> {
         .route(
             "/internal/artifacts/:id",
             get(handlers::internal::get_artifact).delete(handlers::internal::delete_artifact),
+        )
+        // Notes
+        .route(
+            "/internal/projects/:projectId/published-notes",
+            get(handlers::internal::list_published_notes),
         )
         // Processes
         .route(

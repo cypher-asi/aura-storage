@@ -8,6 +8,7 @@ use aura_storage_auth::InternalAuth;
 use aura_storage_core::AppError;
 use aura_storage_events::{models as event_models, repo as event_repo};
 use aura_storage_logs::{models as log_models, repo as log_repo};
+use aura_storage_notes::{models as note_models, repo as note_repo};
 use aura_storage_processes::{models as process_models, repo as process_repo};
 use aura_storage_project_agents::{models as pa_models, repo as pa_repo};
 use aura_storage_sessions::{models as session_models, repo as session_repo};
@@ -416,6 +417,28 @@ pub async fn delete_project_data(
         .await?
         .rows_affected();
 
+    // Notes cascade: comments reference notes, and notes reference folders, so
+    // delete in dependency order (comments → notes → folders).
+    let note_comments = sqlx::query(
+        "DELETE FROM note_comments WHERE note_id IN (SELECT id FROM notes WHERE project_id = $1)",
+    )
+    .bind(project_id)
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+
+    let notes = sqlx::query("DELETE FROM notes WHERE project_id = $1")
+        .bind(project_id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+
+    let notes_folders = sqlx::query("DELETE FROM notes_folders WHERE project_id = $1")
+        .bind(project_id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+
     let tasks = sqlx::query("DELETE FROM tasks WHERE project_id = $1")
         .bind(project_id)
         .execute(&mut *tx)
@@ -446,7 +469,8 @@ pub async fn delete_project_data(
 
     tracing::info!(
         project_id = %project_id,
-        events, messages, logs, artifacts, tasks, sessions, specs, agents,
+        events, messages, logs, artifacts, note_comments, notes, notes_folders,
+        tasks, sessions, specs, agents,
         "project data cascade delete complete"
     );
 
@@ -457,6 +481,9 @@ pub async fn delete_project_data(
             "messages": messages,
             "log_entries": logs,
             "artifacts": artifacts,
+            "note_comments": note_comments,
+            "notes": notes,
+            "notes_folders": notes_folders,
             "tasks": tasks,
             "sessions": sessions,
             "specs": specs,
@@ -670,6 +697,21 @@ pub async fn delete_artifact(
 ) -> Result<StatusCode, AppError> {
     artifact_repo::delete(&state.pool, id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+// ============================================================================
+// Notes (internal — for public blog reads)
+// ============================================================================
+
+/// List published notes for a project. Used by the public-facing blog
+/// service to render published posts without a per-user JWT.
+pub async fn list_published_notes(
+    _auth: InternalAuth,
+    State(state): State<AppState>,
+    Path(project_id): Path<Uuid>,
+) -> Result<Json<Vec<note_models::Note>>, AppError> {
+    let notes = note_repo::list_published_by_project(&state.pool, project_id).await?;
+    Ok(Json(notes))
 }
 
 // ============================================================================

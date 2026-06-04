@@ -16,6 +16,7 @@ aura-storage-logs = { workspace = true }
 aura-storage-events = { workspace = true }
 aura-storage-artifacts = { workspace = true }
 aura-storage-processes = { workspace = true }
+aura-storage-notes = { workspace = true }
 axum = { workspace = true }
 chrono = { workspace = true }
 serde = { workspace = true }
