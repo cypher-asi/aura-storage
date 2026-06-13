@@ -47,6 +47,94 @@ X-Internal-Token: <secret>
 
 ---
 
+## Observability History
+
+Private endpoints for retaining AURA live-eval/status history. These endpoints
+are internal-only; the public status page keeps reading the latest static
+`status.json`.
+
+### POST /internal/observability/runs
+
+**Auth:** Internal
+
+Persist one observability snapshot and fan it out into feature/check history
+rows. Re-sending the same `source + externalRunId + externalRunAttempt` updates
+the run and replaces its child rows, so workflow retries do not double-count.
+
+```json
+{
+  "source": "github-actions",
+  "environment": "production",
+  "externalRunId": "27446843504",
+  "externalRunAttempt": 1,
+  "gitSha": "1bb31b2",
+  "gitBranch": "main",
+  "workflowName": "AURA Observability",
+  "releaseChannel": "nightly",
+  "snapshot": {
+    "schemaVersion": 1,
+    "generatedAt": "2026-06-12T22:41:55.355Z",
+    "source": "github-actions",
+    "environment": "production",
+    "overall": "major_outage",
+    "totals": {},
+    "features": [
+      {
+        "id": "remote-agents",
+        "status": "major_outage",
+        "checks": []
+      }
+    ]
+  }
+}
+```
+
+**Response:** `200` — ObservabilityRun
+
+### GET /internal/observability/latest
+
+**Auth:** Internal
+
+Returns the latest stored run. Optional query parameters: `source`,
+`environment`.
+
+### GET /internal/observability/runs
+
+**Auth:** Internal
+
+Returns stored runs newest-first. Optional query parameters: `source`,
+`environment`, `limit`, `offset`.
+
+### GET /internal/observability/features/:featureId/history
+
+**Auth:** Internal
+
+Returns feature result history for one feature, newest-first. Optional query
+parameters: `source`, `environment`, `limit`, `offset`.
+
+### GET /internal/observability/checks/:checkId/history
+
+**Auth:** Internal
+
+Returns check/eval result history for one check, newest-first. Optional query
+parameters: `source`, `environment`, `limit`, `offset`.
+
+### GET /internal/observability/failures
+
+**Auth:** Internal
+
+Returns recent warn/fail/unknown check rows. Optional query parameters:
+`source`, `environment`, `limit`.
+
+### GET /internal/observability/failures/top
+
+**Auth:** Internal
+
+Returns checks grouped by recurring failure count, newest culprit first.
+Optional query parameters: `source`, `environment`, `limit`.
+
+---
+
 ## Project Agents
 
 ### POST /api/projects/:projectId/agents

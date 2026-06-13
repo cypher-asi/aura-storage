@@ -329,6 +329,31 @@ pub fn create_router() -> Router<AppState> {
         )
         // Stats
         .route("/internal/stats", get(handlers::internal::get_stats))
+        // Observability
+        .route(
+            "/internal/observability/runs",
+            post(handlers::observability::ingest_run).get(handlers::observability::list_runs),
+        )
+        .route(
+            "/internal/observability/latest",
+            get(handlers::observability::latest_run),
+        )
+        .route(
+            "/internal/observability/features/:featureId/history",
+            get(handlers::observability::feature_history),
+        )
+        .route(
+            "/internal/observability/checks/:checkId/history",
+            get(handlers::observability::check_history),
+        )
+        .route(
+            "/internal/observability/failures",
+            get(handlers::observability::recent_failures),
+        )
+        .route(
+            "/internal/observability/failures/top",
+            get(handlers::observability::top_failures),
+        )
         // WebSocket
         .route("/ws/events", get(handlers::ws::ws_events))
 }
