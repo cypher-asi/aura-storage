@@ -6,7 +6,7 @@
 
 ## Overview
 
-aura-storage stores all project execution data for the AURA platform — specs, tasks, sessions, events, project agents, log entries, and processes (workflow definitions, runs, and artifacts). All AURA clients (desktop, web, mobile) and aura-swarm (cloud agent orchestration) connect to this service for execution state.
+aura-storage stores all project execution data for the AURA platform — specs, tasks, sessions, events, project agents, log entries, processes (workflow definitions, runs, and artifacts), and private observability history. All AURA clients (desktop, web, mobile) and aura-swarm (cloud agent orchestration) connect to this service for execution state.
 
 Projects themselves live in [aura-network](https://github.com/cypher-asi/aura-network) (the social layer). This service references project UUIDs from there. Together: aura-network owns "what exists", aura-storage owns "what happened".
 
@@ -117,6 +117,18 @@ Use `X-Internal-Token` for aura-storage internal endpoints. Use the user's JWT f
 
 Public `/api/processes` and `/api/process-folders` endpoints validate org membership through Aura Network before returning or mutating org-scoped data. Desktop-triggered process run, event, and artifact writes now use JWT-backed public process routes; the internal `/internal/process-*` endpoints remain available for service-to-service executor flows.
 
+### From AURA Observability
+
+```
+1. Run live eval probes:         aura-os status:probes
+2. Build latest public status:   aura-os status:snapshot
+3. Persist private history:      POST /internal/observability/runs
+```
+
+The public `/observability` page keeps reading the latest static status JSON.
+Aura storage keeps the private history used to answer internal questions like
+"which eval flakes most often?" and "when did this check get slower?".
+
 ### From Mobile
 
 Same API as desktop — all endpoints are API-first. Authenticate via zOS, then call aura-storage directly.
@@ -128,7 +140,7 @@ Same API as desktop — all endpoints are API-first. Authenticate via zOS, then 
 | Crate | Description |
 |---|---|
 | **aura-storage-core** | Shared types, error handling, pagination |
-| **aura-storage-db** | PostgreSQL connection pool and migrations (12 migrations) |
+| **aura-storage-db** | PostgreSQL connection pool and migrations |
 | **aura-storage-auth** | JWT validation (Auth0 JWKS + HS256) and auth extractors |
 | **aura-storage-server** | Axum HTTP server, router, handlers, WebSocket |
 | **aura-storage-project-agents** | Project agent assignment and status tracking |
@@ -138,6 +150,7 @@ Same API as desktop — all endpoints are API-first. Authenticate via zOS, then 
 | **aura-storage-events** | Session events (typed event stream) |
 | **aura-storage-logs** | Structured log entries |
 | **aura-storage-processes** | Process workflows, nodes, connections, runs, events, and artifacts |
+| **aura-storage-observability** | Private eval/status history for internal trend analysis |
 
 ## License
 

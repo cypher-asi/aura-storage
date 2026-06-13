@@ -3,6 +3,7 @@ pub mod events;
 pub mod internal;
 pub mod logs;
 pub mod notes;
+pub mod observability;
 pub mod processes;
 pub mod project_agents;
 pub mod sessions;
