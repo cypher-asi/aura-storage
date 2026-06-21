@@ -174,7 +174,7 @@ Create a new project agent.
   "orgId": "uuid | null",
   "agentId": "uuid",
   "createdBy": "uuid",
-  "status": "idle | working | blocked | stopped | error",
+  "status": "idle | working | blocked | stopped | error | archived",
   "model": "string | null",
   "totalInputTokens": 0,
   "totalOutputTokens": 0,
@@ -233,7 +233,7 @@ Update a project agent's status.
 
 | Field    | Type   | Required | Description                                   |
 |----------|--------|----------|-----------------------------------------------|
-| `status` | string | Yes      | One of: `idle`, `working`, `blocked`, `stopped`, `error` |
+| `status` | string | Yes      | One of: `idle`, `working`, `blocked`, `stopped`, `error`, `archived` |
 
 ```json
 {
@@ -2119,7 +2119,7 @@ Update a project agent's status from an internal service.
 
 | Field    | Type   | Required | Description                                           |
 |----------|--------|----------|-------------------------------------------------------|
-| `status` | string | Yes      | One of: `idle`, `working`, `blocked`, `stopped`, `error` |
+| `status` | string | Yes      | One of: `idle`, `working`, `blocked`, `stopped`, `error`, `archived` |
 
 ```json
 {

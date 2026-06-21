@@ -5,7 +5,7 @@ use aura_storage_core::AppError;
 
 use crate::models::{CreateProjectAgentRequest, ProjectAgent, UpdateProjectAgentStatusRequest};
 
-const VALID_STATUSES: &[&str] = &["idle", "working", "blocked", "stopped", "error"];
+const VALID_STATUSES: &[&str] = &["idle", "working", "blocked", "stopped", "error", "archived"];
 
 pub async fn create(
     pool: &PgPool,
@@ -93,4 +93,14 @@ pub async fn delete(pool: &PgPool, id: Uuid) -> Result<(), AppError> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::VALID_STATUSES;
+
+    #[test]
+    fn project_agent_statuses_include_archived() {
+        assert!(VALID_STATUSES.contains(&"archived"));
+    }
 }
