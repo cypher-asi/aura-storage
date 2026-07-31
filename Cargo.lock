@@ -200,6 +200,7 @@ dependencies = [
  "aura-storage-processes",
  "aura-storage-project-agents",
  "aura-storage-sessions",
+ "aura-storage-skills",
  "aura-storage-specs",
  "aura-storage-tasks",
  "axum",
@@ -228,6 +229,18 @@ dependencies = [
  "serde_json",
  "sqlx",
  "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "aura-storage-skills"
+version = "0.1.0"
+dependencies = [
+ "aura-storage-core",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sqlx",
  "uuid",
 ]
 

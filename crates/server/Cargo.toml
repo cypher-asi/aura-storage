@@ -18,6 +18,7 @@ aura-storage-artifacts = { workspace = true }
 aura-storage-processes = { workspace = true }
 aura-storage-notes = { workspace = true }
 aura-storage-observability = { workspace = true }
+aura-storage-skills = { workspace = true }
 axum = { workspace = true }
 chrono = { workspace = true }
 serde = { workspace = true }
