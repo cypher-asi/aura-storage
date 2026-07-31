@@ -16,6 +16,7 @@ members = [
     "crates/domain/processes",
     "crates/domain/notes",
     "crates/domain/observability",
+    "crates/domain/skills",
 ]
 
 [workspace.dependencies]
@@ -51,3 +52,4 @@ aura-storage-artifacts = { path = "crates/domain/artifacts" }
 aura-storage-processes = { path = "crates/domain/processes" }
 aura-storage-notes = { path = "crates/domain/notes" }
 aura-storage-observability = { path = "crates/domain/observability" }
+aura-storage-skills = { path = "crates/domain/skills" }

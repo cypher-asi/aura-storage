@@ -19,6 +19,31 @@ pub fn create_router() -> Router<AppState> {
                 .put(handlers::project_agents::update_project_agent)
                 .delete(handlers::project_agents::delete_project_agent),
         )
+        // Portable skill definitions and assignments. Runtime-local grants
+        // deliberately stay in the harness and never pass through storage.
+        .route(
+            "/api/skills",
+            post(handlers::skills::create_skill).get(handlers::skills::list_skills),
+        )
+        .route(
+            "/api/skills/sync",
+            get(handlers::skills::list_skills_for_sync),
+        )
+        .route(
+            "/api/skills/:id",
+            get(handlers::skills::get_skill)
+                .put(handlers::skills::update_skill)
+                .delete(handlers::skills::delete_skill),
+        )
+        .route(
+            "/api/agents/:agentId/skills",
+            get(handlers::skills::list_agent_skills),
+        )
+        .route(
+            "/api/agents/:agentId/skills/:skillId",
+            put(handlers::skills::assign_agent_skill)
+                .delete(handlers::skills::unassign_agent_skill),
+        )
         // Specs
         .route(
             "/api/projects/:projectId/specs",
